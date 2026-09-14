@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { exportCasesToExcel } from '../utils/exportExcel';
 
-export default function MatrixStandard() {
+export default function MatrixStandard({ externalCases = null, moduleName = '', onResetSample }) {
   const [selectedColIndex, setSelectedColIndex] = useState(0);
 
   const columns = [
@@ -169,7 +170,42 @@ export default function MatrixStandard() {
     }
   ];
 
+  const isLiveCases = Boolean(externalCases && externalCases.length > 0);
+
+  // Mapeo flexible para soportar tanto claves en español de n8n como notación camelCase
+  const displayRows = isLiveCases
+    ? externalCases.map((c, idx) => ({
+        id: c.Id || c.id || `CP-${String(idx + 1).padStart(4, '0')}`,
+        module: c['Funcionalidad / Característica'] || c.module || c.modulo || moduleName || 'Autenticación y Seguridad',
+        desc: c['Descripción'] || c.desc || c.description || 'Validación de flujo generado automáticamente.',
+        date: c['Fecha'] || c.date || new Date().toLocaleDateString('es-ES'),
+        scenario: c['Caso de Prueba'] || c.scenario || c.caso || 'Caso de prueba generado por IA',
+        given: c['Precondiciones'] || c.given || c.precondicion || 'Precondición definida en el criterio de aceptación.',
+        when: c['Datos / Acciones de Entrada'] || c.when || c.acciones || '1. Ejecutar pasos de prueba',
+        then: c['Resultado Esperado'] || c.then || c.esperado || 'HTTP 200 OK / Validación exitosa',
+        env: c['Requerimientos de Ambiente'] || c.env || c.ambiente || 'Entorno Staging / Producción',
+        special: c['Procedimientos Especiales'] || c.special || c.especiales || 'N/A',
+        post: c['Postcondición'] || c.post || c.postcondicion || 'N/A'
+      }))
+    : sampleRows;
+
   const activeCol = columns[selectedColIndex];
+
+  const currentModuleTitle = isLiveCases 
+    ? (moduleName || displayRows[0]?.module || 'Autenticación y Seguridad')
+    : 'Autenticación y Seguridad';
+
+  const cleanFileName = currentModuleTitle
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '');
+
+  const fileName = `Matriz_QA_${cleanFileName || 'Corporativa'}.xlsx`;
+
+  const handleDownloadSheet = () => {
+    exportCasesToExcel(displayRows, fileName);
+  };
 
   return (
     <section className="matrix-standard-section" id="estandar-11-col">
@@ -194,15 +230,42 @@ export default function MatrixStandard() {
                 </svg>
               </div>
               <div className="sheet-name-details">
-                <span className="sheet-filename">Matriz_QA_Corporativa_Autenticacion.xlsx</span>
-                <span className="sheet-meta">Generado por n8n · Google Sheets API v4 · 11 Columnas Oficiales</span>
+                <span className="sheet-filename">{fileName}</span>
+                <span className="sheet-meta">
+                  {isLiveCases 
+                    ? `🟢 ${displayRows.length} Casos Generados en Vivo por tu n8n · 11 Columnas Oficiales`
+                    : 'Esquema Base QA · Google Sheets API v4 · 11 Columnas Oficiales'}
+                </span>
               </div>
             </div>
 
             <div className="sheet-actions-right">
-              <span className="sheet-status-pill">
+              {isLiveCases && (
+                <button 
+                  type="button" 
+                  className="btn-sheet-reset-sample"
+                  onClick={onResetSample}
+                  title="Volver a los datos de ejemplo"
+                >
+                  Restaurar Ejemplo
+                </button>
+              )}
+              <button 
+                type="button" 
+                className="btn-sheet-download-top"
+                onClick={handleDownloadSheet}
+                title="Descargar esta matriz en archivo Excel (.xlsx)"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Descargar .xlsx</span>
+              </button>
+              <span className={`sheet-status-pill ${isLiveCases ? 'live-pill' : ''}`}>
                 <span className="sheet-status-dot"></span>
-                Formato QA batchUpdate Aplicado
+                {isLiveCases ? 'En Vivo desde n8n' : 'Formato QA batchUpdate'}
               </span>
             </div>
           </div>
@@ -211,7 +274,9 @@ export default function MatrixStandard() {
           <div className="sheet-tabs-bar">
             <div className="sheet-tab active-tab">
               <span className="tab-indicator"></span>
-              <span className="tab-name">Autenticación y Seguridad (11 Cols)</span>
+              <span className="tab-name">
+                {currentModuleTitle} ({displayRows.length} Casos)
+              </span>
             </div>
             <div className="sheet-tab inactive-tab">
               <span className="tab-name">+ Checkout y Pagos</span>
@@ -264,7 +329,7 @@ export default function MatrixStandard() {
 
               {/* Filas de Datos Reales de QA */}
               <tbody>
-                {sampleRows.map((row, idx) => (
+                {displayRows.map((row, idx) => (
                   <tr key={idx} className={idx % 2 === 1 ? 'zebra-stripe' : ''}>
                     {/* Número de fila de Excel */}
                     <td className="row-number-cell">{idx + 2}</td>

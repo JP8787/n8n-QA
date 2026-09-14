@@ -10,11 +10,31 @@ import TechStack from './components/TechStack';
 import Footer from './components/Footer';
 
 function App() {
+  const [generatedCases, setGeneratedCases] = React.useState(null);
+  const [generatedModule, setGeneratedModule] = React.useState('');
+
   const handleScrollToTest = () => {
     const el = document.getElementById('como-probarlo');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const handleScrollToMatrix = () => {
+    const el = document.getElementById('estandar-11-col');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleCasesGenerated = (cases, moduleName) => {
+    setGeneratedCases(cases);
+    if (moduleName) setGeneratedModule(moduleName);
+  };
+
+  const handleResetToSample = () => {
+    setGeneratedCases(null);
+    setGeneratedModule('');
   };
 
   return (
@@ -36,10 +56,17 @@ function App() {
         <ArchitecturePipeline />
 
         {/* 4. Estándar de la Matriz QA Generada (11 Columnas Oficiales) */}
-        <MatrixStandard />
+        <MatrixStandard 
+          externalCases={generatedCases}
+          moduleName={generatedModule}
+          onResetSample={handleResetToSample}
+        />
 
         {/* 5. Sección Interactiva: Envío Real al Webhook de n8n */}
-        <InteractiveTestSection />
+        <InteractiveTestSection 
+          onCasesGenerated={handleCasesGenerated}
+          onScrollToMatrix={handleScrollToMatrix}
+        />
 
         {/* 6. Stack Tecnológico Utilizado */}
         <TechStack />
