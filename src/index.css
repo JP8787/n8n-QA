@@ -961,20 +961,21 @@ body {
 
 .spreadsheet-window {
   background: #ffffff;
-  border: 1px solid var(--border-sheet-dark);
+  border: 1px solid #cbd5e1;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-elevated);
+  box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   margin-bottom: 36px;
 }
 
+/* Barra Superior: Diseño Claro y Corporativo estilo Google Sheets / Excel */
 .spreadsheet-top-bar {
-  background: #0f172a;
+  background: #ffffff;
   padding: 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -986,13 +987,15 @@ body {
 }
 
 .sheet-icon-wrap {
-  width: 32px;
-  height: 32px;
-  background: rgba(16, 124, 65, 0.2);
-  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #107c41;
 }
 
 .sheet-name-details {
@@ -1002,14 +1005,16 @@ body {
 
 .sheet-filename {
   font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
+  font-weight: 800;
+  color: #0f172a;
   font-family: var(--font-mono);
 }
 
 .sheet-meta {
-  font-size: 11.5px;
-  color: #94a3b8;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 1px;
 }
 
 .sheet-actions-right {
@@ -1024,46 +1029,48 @@ body {
   color: #ffffff;
   border: 1px solid #0e6e39;
   border-radius: var(--radius-full);
-  padding: 6px 14px;
-  font-size: 12px;
+  padding: 6px 15px;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   transition: all 0.15s ease;
-  box-shadow: 0 2px 8px rgba(16, 124, 65, 0.3);
+  box-shadow: 0 2px 8px rgba(16, 124, 65, 0.25);
 }
 
 .btn-sheet-download-top:hover {
   background: #0d6334;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 124, 65, 0.35);
 }
 
 .btn-sheet-reset-sample {
-  background: #334155;
-  color: #cbd5e1;
-  border: 1px solid #475569;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #cbd5e1;
   border-radius: var(--radius-full);
-  padding: 6px 12px;
-  font-size: 11.5px;
+  padding: 6px 14px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-sheet-reset-sample:hover {
-  background: #475569;
-  color: #ffffff;
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
 }
 
 .sheet-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #34d399;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #15803d;
   font-size: 12px;
   font-weight: 700;
   padding: 4px 14px;
@@ -1071,9 +1078,10 @@ body {
 }
 
 .sheet-status-pill.live-pill {
-  background: rgba(16, 185, 129, 0.25);
-  border-color: #10b981;
-  color: #6ee7b7;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
+  font-weight: 800;
 }
 
 .sheet-status-dot {
@@ -1083,19 +1091,19 @@ body {
   background: #10b981;
 }
 
-/* Pestañas estilo Google Sheets */
+/* Pestañas estilo Google Sheets auténtico */
 .sheet-tabs-bar {
-  background: #1e293b;
+  background: #f1f5f9;
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  border-bottom: 1px solid #334155;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid #cbd5e1;
   overflow-x: auto;
 }
 
 .sheet-tab {
-  padding: 10px 20px;
-  font-size: 12.5px;
+  padding: 9px 20px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -1110,14 +1118,19 @@ body {
 .sheet-tab.active-tab {
   background: #ffffff;
   color: #0f172a;
+  border: 1px solid #cbd5e1;
+  border-bottom: 1px solid #ffffff;
+  border-top: 3px solid #107c41;
+  margin-bottom: -1px;
+  font-weight: 800;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.03);
 }
 
-.sheet-tab.inactive-tab {
-  color: #94a3b8;
-}
-
-.sheet-tab.inactive-tab:hover {
-  color: #ffffff;
+.sheet-tab .tab-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #107c41;
 }
 
 /* Viewport de la tabla con scroll horizontal */
@@ -1136,53 +1149,56 @@ body {
 
 /* Fila de letras estilo Excel/Sheets (A a la K) */
 .excel-col-letter-row th {
-  background: #f1f5f9;
-  color: #475569;
-  font-size: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11.5px;
   font-weight: 800;
   text-align: center;
   padding: 6px 8px;
-  border: 1px solid var(--border-sheet);
+  border: 1px solid #cbd5e1;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s ease;
 }
 
 .excel-col-letter-row th.excel-corner-cell {
-  background: #e2e8f0;
-  color: #64748b;
+  background: #f1f5f9;
+  color: #94a3b8;
   width: 44px;
   min-width: 44px;
 }
 
 .excel-col-letter-row th:hover,
 .excel-col-letter-row th.highlighted {
-  background: #ea4b71;
+  background: #107c41;
   color: #ffffff;
+  border-color: #107c41;
 }
 
-/* Fila de títulos de columna QA */
+/* Fila de títulos de columna QA: Limpio, Legible y Corporativo */
 .qa-columns-title-row th {
-  background: #0f172a;
-  color: #ffffff;
+  background: #f8fafc;
+  color: #0f172a;
   padding: 12px 14px;
-  border: 1px solid #334155;
+  border: 1px solid #cbd5e1;
   cursor: pointer;
   vertical-align: top;
   transition: background 0.15s ease;
 }
 
 .qa-columns-title-row th.highlighted {
-  background: #1e293b;
-  border-bottom: 3px solid var(--n8n-coral);
+  background: #eef2f6;
+  border-bottom: 3px solid #107c41;
 }
 
 .qa-columns-title-row th.qa-num-header {
-  background: #1e293b;
+  background: #f1f5f9;
   text-align: center;
   width: 44px;
   font-size: 11px;
-  color: #94a3b8;
+  color: #64748b;
+  font-weight: 800;
+  border: 1px solid #cbd5e1;
 }
 
 .header-cell-box {
@@ -1193,8 +1209,8 @@ body {
 
 .header-col-name {
   font-size: 13.5px;
-  font-weight: 700;
-  color: #ffffff;
+  font-weight: 800;
+  color: #0f172a;
   line-height: 1.3;
 }
 
@@ -1209,10 +1225,10 @@ body {
   width: fit-content;
 }
 
-.header-bdd-pill.given { background: #1e3a8a; color: #93c5fd; }
-.header-bdd-pill.when { background: #78350f; color: #fde68a; }
-.header-bdd-pill.then { background: #064e3b; color: #6ee7b7; }
-.header-bdd-pill.standard { background: #334155; color: #cbd5e1; }
+.header-bdd-pill.given { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.header-bdd-pill.when { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.header-bdd-pill.then { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.header-bdd-pill.standard { background: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; }
 
 /* Celdas de la tabla */
 .spreadsheet-qa-table tbody td {

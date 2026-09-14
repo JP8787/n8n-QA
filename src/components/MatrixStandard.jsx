@@ -191,8 +191,13 @@ export default function MatrixStandard({ externalCases = null, moduleName = '', 
 
   const activeCol = columns[selectedColIndex];
 
+  // Priorizamos el módulo real extraído directamente de los casos generados por n8n (ej: "Módulo de Checkout")
+  const caseModule = (displayRows && displayRows[0]?.module)
+    ? (displayRows[0].module.includes(' - ') ? displayRows[0].module.split(' - ')[0].trim() : displayRows[0].module.trim())
+    : '';
+
   const currentModuleTitle = isLiveCases 
-    ? (moduleName || displayRows[0]?.module || 'Autenticación y Seguridad')
+    ? (caseModule || moduleName || 'Módulo QA')
     : 'Autenticación y Seguridad';
 
   const cleanFileName = currentModuleTitle
@@ -233,7 +238,7 @@ export default function MatrixStandard({ externalCases = null, moduleName = '', 
                 <span className="sheet-filename">{fileName}</span>
                 <span className="sheet-meta">
                   {isLiveCases 
-                    ? `🟢 ${displayRows.length} Casos Generados en Vivo por tu n8n · 11 Columnas Oficiales`
+                    ? `🟢 ${displayRows.length} Casos Generados en Vivo por tu n8n · Módulo: ${currentModuleTitle}`
                     : 'Esquema Base QA · Google Sheets API v4 · 11 Columnas Oficiales'}
                 </span>
               </div>
@@ -270,19 +275,13 @@ export default function MatrixStandard({ externalCases = null, moduleName = '', 
             </div>
           </div>
 
-          {/* Barra de Pestañas (Tabs) Corporativa */}
+          {/* Barra de Pestañas (Tabs) Oficial: Solo pestaña funcional con el módulo activo */}
           <div className="sheet-tabs-bar">
             <div className="sheet-tab active-tab">
               <span className="tab-indicator"></span>
               <span className="tab-name">
-                {currentModuleTitle} ({displayRows.length} Casos)
+                {currentModuleTitle} ({displayRows.length} Casos Oficiales)
               </span>
-            </div>
-            <div className="sheet-tab inactive-tab">
-              <span className="tab-name">+ Checkout y Pagos</span>
-            </div>
-            <div className="sheet-tab inactive-tab">
-              <span className="tab-name">+ Gestión de Usuarios</span>
             </div>
           </div>
 

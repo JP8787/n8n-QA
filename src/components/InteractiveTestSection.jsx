@@ -181,10 +181,22 @@ CRITERIOS DE ACEPTACIÓN:
       const base64Data = event.target.result.split(',')[1];
       const mimeType = currentFile.rawFile.type || 'text/plain';
 
+      // Deducir nombre de módulo del archivo para no enviar "Autenticación" fijo cuando se sube otro archivo
+      const fileBaseTitle = (currentFile && currentFile.name && !currentFile.isSample)
+        ? currentFile.name
+            .replace(/\.[^/.]+$/, "")
+            .replace(/requerimientos/gi, "")
+            .replace(/qa/gi, "")
+            .replace(/^[_\s-]+|[_\s-]+$/g, "")
+            .replace(/_/g, " ")
+            .trim() || 'Módulo QA'
+        : 'Autenticación y Seguridad';
+
       // Armamos un JSON limpio con los datos y el texto extraído
       const payload = {
         filename: currentFile.name,
-        modulo: 'Autenticación y Seguridad',
+        modulo: fileBaseTitle,
+        module: fileBaseTitle,
         mimeType: mimeType,
         fileData: base64Data, // Archivo convertido a Base64
         texto: textoExtraido, // Texto limpio extraído de Word, PDF, Excel, TXT o CSV
@@ -240,24 +252,41 @@ CRITERIOS DE ACEPTACIÓN:
             : (Array.isArray(data)
                 ? data
                 : (data.data?.casos || data.casos_de_prueba || null));
-          const module = data.modulo || data.module || 'Autenticación y Seguridad';
+
+          // Detección inteligente del módulo real:
+          // 1. Mirar si el primer caso generado trae su propia columna "Funcionalidad / Característica"
+          let detectedModule = '';
+          if (cases && cases.length > 0) {
+            const firstCase = cases[0];
+            const feat = firstCase['Funcionalidad / Característica'] || firstCase.module || firstCase.modulo || '';
+            if (feat) {
+              detectedModule = feat.includes(' - ') ? feat.split(' - ')[0].trim() : feat.trim();
+            }
+          }
+
+          // 2. Si no, mirar si data.modulo vino de n8n y no es el default estático
+          if (!detectedModule && data.modulo && data.modulo !== 'Autenticación y Seguridad') {
+            detectedModule = data.modulo;
+          }
+
+          const finalModule = detectedModule || fileBaseTitle || data.modulo || 'Módulo QA';
 
           // Sincronizamos con la tabla de 11 columnas de la sección 4
           if (cases && cases.length > 0 && onCasesGenerated) {
-            onCasesGenerated(cases, module);
+            onCasesGenerated(cases, finalModule);
           }
 
           setN8nResult({
             type: cases ? 'cases' : 'json',
             cases: cases,
-            module: module,
+            module: finalModule,
             sheetUrl: data.sheetUrl || data.url || null,
             raw: data
           });
 
           setExecutionLogs(prev => [
             ...prev,
-            `[${new Date().toLocaleTimeString()}] ${cases ? `${cases.length} casos extraídos y sincronizados con la Matriz de 11 Columnas.` : 'Datos procesados correctamente.'}`
+            `[${new Date().toLocaleTimeString()}] ${cases ? `${cases.length} casos extraídos (Módulo: ${finalModule}) y sincronizados con la Matriz.` : 'Datos procesados correctamente.'}`
           ]);
         }
       } catch (err) {
