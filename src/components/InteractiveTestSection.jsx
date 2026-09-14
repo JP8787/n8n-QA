@@ -1,11 +1,9 @@
 import React, { useState, useRef } from 'react';
 
 // URL oficial del Webhook de n8n configurada por el usuario
-const WEBHOOK_URL = "https://tu-n8n.com/webhook/generar-qa";
+const WEBHOOK_URL = "http://localhost:5678/webhook/generar-qa";
 
 export default function InteractiveTestSection() {
-  const [targetWebhookUrl, setTargetWebhookUrl] = useState(WEBHOOK_URL);
-  const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -97,8 +95,7 @@ CRITERIOS DE ACEPTACIÓN:
     setIsSending(true);
     setWebhookError(null);
     setExecutionLogs([
-      `[${new Date().toLocaleTimeString()}] Iniciando petición HTTP POST hacia n8n...`,
-      `[${new Date().toLocaleTimeString()}] Destino: ${targetWebhookUrl}`,
+      `[${new Date().toLocaleTimeString()}] Conectando con n8n en: ${WEBHOOK_URL}...`,
       `[${new Date().toLocaleTimeString()}] Empaquetando archivo "${currentFile.name}" en FormData...`
     ]);
 
@@ -112,7 +109,7 @@ CRITERIOS DE ACEPTACIÓN:
       formData.append('timestamp', new Date().toISOString());
 
       // Petición real vía fetch a n8n
-      const response = await fetch(targetWebhookUrl, {
+      const response = await fetch(WEBHOOK_URL, {
         method: 'POST',
         body: formData,
       });
@@ -156,8 +153,8 @@ CRITERIOS DE ACEPTACIÓN:
     } catch (err) {
       console.warn('Error al contactar webhook de n8n:', err);
       setWebhookError({
-        message: err.message || 'No se pudo contactar con el webhook de n8n.',
-        url: targetWebhookUrl
+        message: err.message || 'No se pudo contactar con el webhook de n8n en localhost:5678.',
+        url: WEBHOOK_URL
       });
     } finally {
       setIsSending(false);
@@ -173,53 +170,6 @@ CRITERIOS DE ACEPTACIÓN:
           <p className="section-subtitle">
             El frontend despacha el archivo de requerimientos vía HTTP POST directamente a tu Webhook de n8n, donde tu pipeline procesa la IA y genera la hoja en Google Sheets.
           </p>
-        </div>
-
-        {/* Barra de Conexión del Webhook */}
-        <div className="n8n-connection-panel">
-          <div className="connection-status-left">
-            <div className="n8n-node-icon-small">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <circle cx="6" cy="12" r="3.5" fill="#ea4b71" />
-                <circle cx="18" cy="12" r="3.5" fill="#ea4b71" />
-                <path d="M9.5 12h5" stroke="#ea4b71" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="connection-text">
-              <span className="conn-label">Endpoint n8n Configurado:</span>
-              {!isEditingUrl ? (
-                <code className="conn-url">{targetWebhookUrl}</code>
-              ) : (
-                <input 
-                  type="url" 
-                  className="conn-url-input"
-                  value={targetWebhookUrl}
-                  onChange={(e) => setTargetWebhookUrl(e.target.value)}
-                  placeholder="http://localhost:5678/webhook/generar-qa"
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="connection-actions-right">
-            {!isEditingUrl ? (
-              <button 
-                type="button" 
-                className="btn-conn-toggle"
-                onClick={() => setIsEditingUrl(true)}
-              >
-                Cambiar URL
-              </button>
-            ) : (
-              <button 
-                type="button" 
-                className="btn-conn-save"
-                onClick={() => setIsEditingUrl(false)}
-              >
-                Guardar URL
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Caja de Interacción Principal */}
@@ -343,17 +293,17 @@ CRITERIOS DE ACEPTACIÓN:
                       <line x1="12" y1="8" x2="12" y2="12"></line>
                       <line x1="12" y1="16" x2="12.01" y2="16"></line>
                     </svg>
-                    <strong>No se pudo conectar con el Webhook de n8n</strong>
+                    <strong>No se pudo conectar con tu Webhook de n8n</strong>
                   </div>
                   <p className="error-text">
-                    La URL <code>{webhookError.url}</code> no respondió o el navegador bloqueó la petición por CORS.
+                    La URL <code>{webhookError.url}</code> no respondió.
                   </p>
                   <div className="error-steps">
-                    <strong>Pasos para conectar tu n8n:</strong>
+                    <strong>Pasos para verificar tu flujo en n8n:</strong>
                     <ol>
-                      <li>Asegúrate de que n8n esté corriendo con el nodo <strong>Webhook</strong> activo en modo de escucha.</li>
-                      <li>Si n8n está en tu máquina local (`localhost:5678`), introduce arriba tu URL o usa un túnel seguro con <code>ngrok http 5678</code>.</li>
-                      <li>Haz clic arriba en <strong>"Cambiar URL"</strong> para actualizar tu webhook activo.</li>
+                      <li>Asegúrate de que n8n esté corriendo en <code>http://localhost:5678</code>.</li>
+                      <li>Verifica que el nodo <strong>Webhook</strong> tenga la ruta <code>generar-qa</code> y método <strong>POST</strong>.</li>
+                      <li>Asegúrate de que el workflow esté <strong>Activo</strong> (Active) o en modo <em>Listen for test event</em>.</li>
                     </ol>
                   </div>
                   <button 
@@ -409,9 +359,9 @@ CRITERIOS DE ACEPTACIÓN:
                       <polyline points="12 6 12 12 16 14"></polyline>
                     </svg>
                   </div>
-                  <h4 className="standby-title">Esperando Disparo de Automatización</h4>
+                  <h4 className="standby-title">Listo para recibir el archivo</h4>
                   <p className="standby-desc">
-                    Al pulsar <strong>"Disparar Automatización en n8n"</strong>, el archivo viaja al Webhook. Tu flujo en n8n ejecutará el modelo de lenguaje (Gemini), estructurará las 11 columnas y creará la hoja en Google Sheets.
+                    Al pulsar <strong>"Disparar Automatización en n8n"</strong>, el archivo viaja a tu webhook local (<code>localhost:5678</code>). Tu flujo ejecutará el modelo de lenguaje (Gemini), estructurará las 11 columnas y creará la hoja en Google Sheets.
                   </p>
 
                   <div className="standby-pipeline-nodes">
