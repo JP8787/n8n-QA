@@ -12,6 +12,7 @@ import Footer from './components/Footer';
 function App() {
   const [generatedCases, setGeneratedCases] = React.useState(null);
   const [generatedModule, setGeneratedModule] = React.useState('');
+  const [uploadedFileName, setUploadedFileName] = React.useState('');
 
   const handleScrollToTest = () => {
     const el = document.getElementById('como-probarlo');
@@ -27,14 +28,16 @@ function App() {
     }
   };
 
-  const handleCasesGenerated = (cases, moduleName) => {
+  const handleCasesGenerated = (cases, moduleName, fileName = '') => {
     setGeneratedCases(cases);
     if (moduleName) setGeneratedModule(moduleName);
+    if (fileName) setUploadedFileName(fileName);
   };
 
   const handleResetToSample = () => {
     setGeneratedCases(null);
     setGeneratedModule('');
+    setUploadedFileName('');
   };
 
   return (
@@ -59,6 +62,7 @@ function App() {
         <MatrixStandard 
           externalCases={generatedCases}
           moduleName={generatedModule}
+          uploadedFileName={uploadedFileName}
           onResetSample={handleResetToSample}
         />
 

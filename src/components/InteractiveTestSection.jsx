@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as XLSX from 'xlsx';
-import { exportCasesToExcel, exportCasesToCsv } from '../utils/exportExcel';
+import SpreadsheetViewer from './SpreadsheetViewer';
 
 // Configuración obligatoria para que el lector de PDF funcione en el navegador
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -181,16 +181,11 @@ CRITERIOS DE ACEPTACIÓN:
       const base64Data = event.target.result.split(',')[1];
       const mimeType = currentFile.rawFile.type || 'text/plain';
 
-      // Deducir nombre de módulo del archivo para no enviar "Autenticación" fijo cuando se sube otro archivo
-      const fileBaseTitle = (currentFile && currentFile.name && !currentFile.isSample)
-        ? currentFile.name
-            .replace(/\.[^/.]+$/, "")
-            .replace(/requerimientos/gi, "")
-            .replace(/qa/gi, "")
-            .replace(/^[_\s-]+|[_\s-]+$/g, "")
-            .replace(/_/g, " ")
-            .trim() || 'Módulo QA'
-        : 'Autenticación y Seguridad';
+      // Deducir nombre base del archivo sin extensiones para titular la matriz
+      const fileRawBase = (currentFile && currentFile.name)
+        ? currentFile.name.replace(/\.[^/.]+$/, "").trim()
+        : '';
+      const fileBaseTitle = fileRawBase || 'Módulo QA';
 
       // Armamos un JSON limpio con los datos y el texto extraído
       const payload = {
@@ -226,21 +221,29 @@ CRITERIOS DE ACEPTACIÓN:
 
         // Si n8n devuelve el archivo binario Excel generado por el workflow
         if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('octet-stream')) {
-          const blob = await respuesta.blob();
-          const downloadUrl = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = downloadUrl;
-          a.download = `Matriz_QA_${currentFile.name.replace(/\.[^/.]+$/, "")}.xlsx`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
+          const arrayBuffer = await respuesta.arrayBuffer();
+          // Leemos el libro de Excel en memoria sin forzar descargas a disco
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const parsedCases = XLSX.utils.sheet_to_json(worksheet);
+
+          if (parsedCases && parsedCases.length > 0 && onCasesGenerated) {
+            onCasesGenerated(parsedCases, fileBaseTitle, currentFile.name);
+          }
 
           setN8nResult({
-            type: 'excel',
-            message: 'Archivo Excel binario descargado exitosamente.',
-            url: downloadUrl,
-            raw: { status: 'success', file: 'binary_xlsx' }
+            type: 'cases',
+            cases: parsedCases,
+            module: fileBaseTitle,
+            fileName: currentFile.name,
+            raw: { status: 'success', rowsParsed: parsedCases.length }
           });
+
+          setExecutionLogs(prev => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] Archivo Excel binario procesado (${parsedCases.length} casos leídos) y visualizado en la matriz.`
+          ]);
         } else {
           // Si n8n devuelve un JSON con casos estructurados o URL de Sheets
           const data = await respuesta.json();
@@ -253,40 +256,26 @@ CRITERIOS DE ACEPTACIÓN:
                 ? data
                 : (data.data?.casos || data.casos_de_prueba || null));
 
-          // Detección inteligente del módulo real:
-          // 1. Mirar si el primer caso generado trae su propia columna "Funcionalidad / Característica"
-          let detectedModule = '';
-          if (cases && cases.length > 0) {
-            const firstCase = cases[0];
-            const feat = firstCase['Funcionalidad / Característica'] || firstCase.module || firstCase.modulo || '';
-            if (feat) {
-              detectedModule = feat.includes(' - ') ? feat.split(' - ')[0].trim() : feat.trim();
-            }
-          }
+          // Preservamos el nombre del archivo del usuario fielmente
+          const finalModule = fileBaseTitle;
 
-          // 2. Si no, mirar si data.modulo vino de n8n y no es el default estático
-          if (!detectedModule && data.modulo && data.modulo !== 'Autenticación y Seguridad') {
-            detectedModule = data.modulo;
-          }
-
-          const finalModule = detectedModule || fileBaseTitle || data.modulo || 'Módulo QA';
-
-          // Sincronizamos con la tabla de 11 columnas de la sección 4
+          // Sincronizamos con la tabla de 11 columnas de la sección 4 y el visor local
           if (cases && cases.length > 0 && onCasesGenerated) {
-            onCasesGenerated(cases, finalModule);
+            onCasesGenerated(cases, finalModule, currentFile.name);
           }
 
           setN8nResult({
             type: cases ? 'cases' : 'json',
             cases: cases,
             module: finalModule,
+            fileName: currentFile.name,
             sheetUrl: data.sheetUrl || data.url || null,
             raw: data
           });
 
           setExecutionLogs(prev => [
             ...prev,
-            `[${new Date().toLocaleTimeString()}] ${cases ? `${cases.length} casos extraídos (Módulo: ${finalModule}) y sincronizados con la Matriz.` : 'Datos procesados correctamente.'}`
+            `[${new Date().toLocaleTimeString()}] ${cases ? `${cases.length} casos extraídos (Archivo: ${currentFile.name}) y visualizados en vivo en la matriz.` : 'Datos procesados correctamente.'}`
           ]);
         }
       } catch (err) {
@@ -311,28 +300,6 @@ CRITERIOS DE ACEPTACIÓN:
 
     // Disparamos la lectura del archivo
     reader.readAsDataURL(currentFile.rawFile);
-  };
-
-  // Descarga del Excel generado
-  const handleDownloadExcel = () => {
-    if (!n8nResult || !n8nResult.cases) return;
-    const cleanMod = (n8nResult.module || 'Autenticacion')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_-]/g, '');
-    exportCasesToExcel(n8nResult.cases, `Matriz_QA_${cleanMod || 'Corporativa'}.xlsx`);
-  };
-
-  // Descarga del CSV
-  const handleDownloadCsv = () => {
-    if (!n8nResult || !n8nResult.cases) return;
-    const cleanMod = (n8nResult.module || 'Autenticacion')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_-]/g, '');
-    exportCasesToCsv(n8nResult.cases, `Matriz_QA_${cleanMod || 'Corporativa'}.csv`);
   };
 
   return (
@@ -525,8 +492,8 @@ CRITERIOS DE ACEPTACIÓN:
                       <strong className="metric-value">{n8nResult.cases ? n8nResult.cases.length : 1}</strong>
                     </div>
                     <div className="metric-pill">
-                      <span className="metric-label">Módulo:</span>
-                      <strong className="metric-value">{n8nResult.module || 'Autenticación'}</strong>
+                      <span className="metric-label">Archivo:</span>
+                      <strong className="metric-value">{n8nResult.fileName || (file ? file.name : 'Archivo QA')}</strong>
                     </div>
                     <div className="metric-pill">
                       <span className="metric-label">Columnas:</span>
@@ -534,53 +501,35 @@ CRITERIOS DE ACEPTACIÓN:
                     </div>
                   </div>
 
-                  {/* Botones de Acción Primarios */}
-                  <div className="result-actions-grid">
-                    {/* Botón Descarga Excel */}
-                    <button 
-                      type="button" 
-                      className="btn-action-primary-download"
-                      onClick={handleDownloadExcel}
-                      title="Descargar archivo .xlsx compatible con Microsoft Excel"
-                    >
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg>
-                      <span>Descargar Matriz QA (.xlsx)</span>
-                    </button>
+                  {/* VISOR DE HOJA DE CÁLCULO ACOMODADO EN VIVO (Sin descargas forzadas) */}
+                  {n8nResult.cases && (
+                    <div className="result-spreadsheet-preview">
+                      <SpreadsheetViewer
+                        cases={n8nResult.cases}
+                        uploadedFileName={n8nResult.fileName || (file ? file.name : '')}
+                        moduleName={n8nResult.module}
+                        isLive={true}
+                        compact={true}
+                      />
+                    </div>
+                  )}
 
-                    {/* Botón Ver en Tabla de 11 Columnas */}
+                  {/* Botones de Navegación y Enlace Oficial */}
+                  <div className="result-actions-grid">
                     <button 
                       type="button" 
                       className="btn-action-view-table"
                       onClick={onScrollToMatrix}
-                      title="Ver los casos en la hoja de cálculo interactiva"
+                      title="Ver e inspeccionar columnas en la sección principal"
                     >
                       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
                         <rect x="3" y="3" width="18" height="18" rx="2"></rect>
                         <line x1="3" y1="9" x2="21" y2="9"></line>
                         <line x1="9" y1="21" x2="9" y2="9"></line>
                       </svg>
-                      <span>Ver en Tabla de 11 Columnas</span>
+                      <span>Inspeccionar Columnas en Sección Principal</span>
                     </button>
 
-                    {/* Botón Descarga CSV */}
-                    <button 
-                      type="button" 
-                      className="btn-action-secondary-csv"
-                      onClick={handleDownloadCsv}
-                      title="Descargar matriz en archivo CSV estándar"
-                    >
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                      </svg>
-                      <span>Descargar CSV</span>
-                    </button>
-
-                    {/* Botón Google Sheets si n8n incluyó la URL */}
                     {n8nResult.sheetUrl && (
                       <a 
                         href={n8nResult.sheetUrl} 
