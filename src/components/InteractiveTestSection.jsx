@@ -79,7 +79,7 @@ CRITERIOS DE ACEPTACIÓN:
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // DISPARO REAL AL WEBHOOK DE N8N
+  // DISPARO REAL AL WEBHOOK DE N8N CON FILEREADER Y BASE64 JSON
   const handleTriggerN8n = async () => {
     let currentFile = file;
     if (!currentFile || !currentFile.rawFile) {
@@ -96,73 +96,94 @@ CRITERIOS DE ACEPTACIÓN:
     setIsSending(true);
     setWebhookError(null);
     setExecutionLogs([
-      `[${new Date().toLocaleTimeString()}] Conectando con n8n en: ${WEBHOOK_URL}...`,
-      `[${new Date().toLocaleTimeString()}] Empaquetando archivo "${currentFile.name}" en FormData con clave 'file'...`
+      `[${new Date().toLocaleTimeString()}] Leyendo archivo "${currentFile.name}" y convirtiendo a Base64...`,
+      `[${new Date().toLocaleTimeString()}] Conectando con n8n en: ${WEBHOOK_URL}...`
     ]);
 
-    try {
-      // El envío con archivo usando FormData NO debe llevar 'Content-Type' manual,
-      // el navegador se encarga de ponerlo con su boundary automáticamente.
-      const formData = new FormData();
-      formData.append('file', currentFile.rawFile); // Coincide con 'Field Name for Binary Data' en n8n
-      formData.append('filename', currentFile.name);
-      formData.append('modulo', 'Autenticación y Seguridad');
-      formData.append('timestamp', new Date().toISOString());
+    const reader = new FileReader();
 
-      // Petición POST directa a n8n sin headers de Content-Type
-      const respuesta = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        body: formData
-        // ¡OJO! No ponemos headers: { 'Content-Type': ... }, el navegador asigna el boundary
-      });
+    reader.onload = async (event) => {
+      // Extraemos solo el código Base64 del archivo
+      const base64Data = event.target.result.split(',')[1];
+      const mimeType = currentFile.rawFile.type || 'text/plain';
 
-      if (!respuesta.ok) {
-        throw new Error(`El webhook de n8n respondió con código HTTP ${respuesta.status} (${respuesta.statusText})`);
-      }
+      // Armamos un JSON limpio con los datos
+      const payload = {
+        filename: currentFile.name,
+        modulo: 'Autenticación y Seguridad',
+        mimeType: mimeType,
+        fileData: base64Data // Aquí va el archivo convertido
+      };
 
-      setExecutionLogs(prev => [
-        ...prev,
-        `[${new Date().toLocaleTimeString()}] Respuesta 200 OK recibida desde n8n.`
-      ]);
-
-      const contentType = respuesta.headers.get('content-type') || '';
-
-      // Si n8n devuelve el archivo binario Excel generado por el workflow
-      if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('octet-stream')) {
-        const blob = await respuesta.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = `Matriz_QA_${currentFile.name.replace(/\.[^/.]+$/, "")}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        setN8nResult({
-          type: 'excel',
-          message: 'Archivo Excel generado por tu automatización en n8n descargado exitosamente.',
-          url: downloadUrl
+      try {
+        const respuesta = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json' // Cambiamos a JSON puro
+          },
+          body: JSON.stringify(payload)
         });
-      } else {
-        // Si n8n devuelve un JSON con la URL de Google Sheets o el resultado
-        const data = await respuesta.json();
-        console.log('Resultado n8n:', data);
 
-        setN8nResult({
-          type: 'json',
-          sheetUrl: data.sheetUrl || data.url || null,
-          data: data
+        if (!respuesta.ok) {
+          throw new Error(`El webhook de n8n respondió con código HTTP ${respuesta.status} (${respuesta.statusText})`);
+        }
+
+        setExecutionLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] Respuesta 200 OK recibida desde n8n.`
+        ]);
+
+        const contentType = respuesta.headers.get('content-type') || '';
+
+        // Si n8n devuelve el archivo binario Excel generado por el workflow
+        if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('octet-stream')) {
+          const blob = await respuesta.blob();
+          const downloadUrl = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = `Matriz_QA_${currentFile.name.replace(/\.[^/.]+$/, "")}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+
+          setN8nResult({
+            type: 'excel',
+            message: 'Archivo Excel generado por tu automatización en n8n descargado exitosamente.',
+            url: downloadUrl
+          });
+        } else {
+          // Si n8n devuelve un JSON con la URL de Google Sheets o el resultado
+          const data = await respuesta.json();
+          console.log("Respuesta n8n:", data);
+
+          setN8nResult({
+            type: 'json',
+            sheetUrl: data.sheetUrl || data.url || null,
+            data: data
+          });
+        }
+      } catch (err) {
+        console.error("Error:", err);
+        setWebhookError({
+          message: err.message || 'No se pudo contactar con el webhook de n8n en localhost:5678.',
+          url: WEBHOOK_URL
         });
+      } finally {
+        setIsSending(false);
       }
-    } catch (err) {
-      console.warn('Error al contactar webhook de n8n:', err);
+    };
+
+    reader.onerror = (error) => {
+      console.error("Error al leer el archivo:", error);
       setWebhookError({
-        message: err.message || 'No se pudo contactar con el webhook de n8n en localhost:5678.',
+        message: 'Error al leer el archivo local antes del envío.',
         url: WEBHOOK_URL
       });
-    } finally {
       setIsSending(false);
-    }
+    };
+
+    // Disparamos la lectura del archivo
+    reader.readAsDataURL(currentFile.rawFile);
   };
 
   return (
@@ -172,7 +193,7 @@ CRITERIOS DE ACEPTACIÓN:
           <span className="section-kicker">Ejecución en Vivo con n8n</span>
           <h2 className="section-title">Probar Automatización con tu Webhook de n8n</h2>
           <p className="section-subtitle">
-            El frontend despacha el archivo de requerimientos vía HTTP POST directamente a tu Webhook de n8n, donde tu pipeline procesa la IA y genera la hoja en Google Sheets.
+            El frontend convierte el archivo a Base64 y lo despacha como JSON seguro directamente a tu Webhook de n8n, donde tu pipeline procesa la IA y genera la hoja en Google Sheets.
           </p>
         </div>
 
@@ -266,7 +287,7 @@ CRITERIOS DE ACEPTACIÓN:
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                 </svg>
-                <span>{isSending ? 'Enviando petición a n8n...' : 'Disparar Automatización en n8n (HTTP POST)'}</span>
+                <span>{isSending ? 'Enviando petición a n8n...' : 'Disparar Automatización en n8n (JSON Base64)'}</span>
               </button>
             </div>
           </div>
@@ -365,21 +386,21 @@ CRITERIOS DE ACEPTACIÓN:
                   </div>
                   <h4 className="standby-title">Listo para recibir el archivo</h4>
                   <p className="standby-desc">
-                    Al pulsar <strong>"Disparar Automatización en n8n"</strong>, el archivo viaja a tu webhook local (<code>localhost:5678</code>). Tu flujo ejecutará el modelo de lenguaje (Gemini), estructurará las 11 columnas y creará la hoja en Google Sheets.
+                    Al pulsar <strong>"Disparar Automatización en n8n"</strong>, el archivo viaja convertido en Base64 mediante JSON a tu webhook local (<code>localhost:5678</code>). Tu flujo ejecutará el modelo de lenguaje (Gemini), estructurará las 11 columnas y creará la hoja en Google Sheets.
                   </p>
 
                   <div className="standby-pipeline-nodes">
                     <div className="standby-step">
                       <span className="step-num">1</span>
-                      <span className="step-text">Webhook recibe FormData con clave 'file'</span>
+                      <span className="step-text">FileReader convierte archivo a Base64</span>
                     </div>
                     <div className="standby-step">
                       <span className="step-num">2</span>
-                      <span className="step-text">Gemini infiere casos BDD</span>
+                      <span className="step-text">POST JSON con payload: fileData</span>
                     </div>
                     <div className="standby-step">
                       <span className="step-num">3</span>
-                      <span className="step-text">Google Sheets API batchUpdate</span>
+                      <span className="step-text">Gemini infiere casos y Sheets formatea</span>
                     </div>
                   </div>
                 </div>
