@@ -4,55 +4,12 @@ export default function ArchitecturePipeline() {
   const [activeStep, setActiveStep] = useState(5);
   const [isRunning, setIsRunning] = useState(false);
 
-  const steps = [
-    {
-      id: 1,
-      title: '1. Ingesta de Requerimientos',
-      node: 'Formulario / Documento',
-      desc: 'Recepción de criterios de aceptación, historias de usuario o especificaciones funcionales en texto plano/Markdown.',
-      badge: 'Trigger HTTP',
-      details: 'Webhook n8n captura el payload entrante con metadata del módulo y criterios.'
-    },
-    {
-      id: 2,
-      title: '2. Motor IA Multimodelo',
-      node: 'Gemini 1.5/2.0 + OpenRouter',
-      desc: 'Inferencia de casos positivos, negativos y de borde bajo metodología BDD con conmutación por error (fallback) automática.',
-      badge: 'AI Core',
-      details: 'Generación controlada mediante System Instructions y Schemas JSON estrictos.'
-    },
-    {
-      id: 3,
-      title: '3. Parser Universal BDD',
-      node: 'Extracción & Sanitización JSON',
-      desc: 'Normalización de datos, numeración estricta de pasos de entrada y validación del esquema de 11 columnas.',
-      badge: 'Data Logic',
-      details: 'JavaScript Node transforma BDD (Dado/Cuando/Entonces) en la estructura corporativa.'
-    },
-    {
-      id: 4,
-      title: '4. Sincronización Google Sheets',
-      node: 'Create Sheet + Sync 11 Cols',
-      desc: 'Crea una pestaña nueva con timestamp del módulo e inserta las filas normalizadas en el estándar oficial.',
-      badge: 'Google Sheets API',
-      details: 'Llamada v4 spreadsheets.batchUpdate creando la pestaña con nombre temático.'
-    },
-    {
-      id: 5,
-      title: '5. Aplicar Formato Corporativo',
-      node: 'HTTP Request batchUpdate API',
-      desc: 'Encabezado temático pastel, bordes automáticos, anchos por columna optimizados y zebra striping dinámico.',
-      badge: 'Styling Engine',
-      details: 'Payload con updateDimensionProperties, repeatCell, textFormat y bordes sólidos.'
-    }
-  ];
-
   const handleSimulate = () => {
     if (isRunning) return;
     setIsRunning(true);
     setActiveStep(1);
 
-    const delays = [800, 1600, 2400, 3200, 4000];
+    const delays = [700, 1500, 2300, 3100, 4000];
     delays.forEach((delay, idx) => {
       setTimeout(() => {
         setActiveStep(idx + 1);
@@ -70,76 +27,119 @@ export default function ArchitecturePipeline() {
           <span className="section-kicker">Pipeline Técnico</span>
           <h2 className="section-title">Arquitectura del Flujo en n8n</h2>
           <p className="section-subtitle">
-            Orquestación serverless de alta resiliencia que conecta modelos de lenguaje con la API oficial de Google Sheets.
+            Orquestación serverless que conecta modelos de lenguaje con la API oficial de Google Sheets sin trabajo manual.
           </p>
         </div>
 
         <div className="pipeline-card">
           <div className="pipeline-top-bar">
             <div>
-              <h3 className="pipeline-heading">Pipeline de Procesamiento BDD a Google Sheets</h3>
-              <p className="pipeline-subheading">Haz clic en "Simular Pipeline" para ver el recorrido de los datos en tiempo real.</p>
+              <h3 className="pipeline-heading">Flujo de Procesamiento (BDD a Google Sheets)</h3>
+              <p className="pipeline-subheading">Visualiza cómo viajan los datos desde los requerimientos brutos hasta la hoja formateada.</p>
             </div>
             <button 
               type="button" 
-              className="pill-button pill-button-primary"
+              className="btn-n8n-simulate"
               onClick={handleSimulate}
               disabled={isRunning}
             >
-              {isRunning ? 'Ejecutando Flujo...' : '▶ Simular Pipeline'}
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>{isRunning ? 'Ejecutando Flujo...' : 'Simular Pipeline'}</span>
             </button>
           </div>
 
-          {/* Diagrama Visual */}
-          <div className="pipeline-diagram">
-            {steps.map((step, idx) => {
-              const isCurrent = activeStep === step.id;
-              const isPassed = activeStep >= step.id;
-
-              return (
-                <React.Fragment key={step.id}>
-                  <div className={`pipeline-node-box ${isCurrent && isRunning ? 'running' : ''} ${isPassed ? 'completed' : ''}`}>
-                    <div className="p-node-header">
-                      <span className="p-node-badge">{step.badge}</span>
-                      <span className={`p-status-dot ${isPassed ? 'success' : ''} ${isCurrent && isRunning ? 'pulsing' : ''}`}></span>
-                    </div>
-                    <div className="p-node-title">{step.node}</div>
-                    <div className="p-node-step">{step.title}</div>
-                    <p className="p-node-desc">{step.desc}</p>
-                  </div>
-
-                  {idx < steps.length - 1 && (
-                    <div className={`pipeline-arrow ${activeStep > step.id ? 'active' : ''}`}>
-                      <span className="arrow-line"></span>
-                      <span className="arrow-head">▶</span>
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-
-          {/* Features del formateo batchUpdate API */}
-          <div className="pipeline-format-specs">
-            <h4 className="format-specs-title">
-              <span>✦</span> Reglas de Formato QA Aplicadas Automáticamente (batchUpdate API)
-            </h4>
-            <div className="format-grid">
-              <div className="format-pill-item">
-                <span className="check-icon">✓</span>
-                <strong>Encabezado temático pastel:</strong> Tono suave asignado dinámicamente según el módulo funcional.
+          {/* Diagrama de Árbol / Pipeline */}
+          <div className="pipeline-tree-wrapper">
+            {/* Nodo 1: Ingesta */}
+            <div className={`tree-node-card ${activeStep >= 1 ? 'completed' : ''} ${activeStep === 1 && isRunning ? 'running' : ''}`}>
+              <div className="t-node-header">
+                <span className="t-node-badge">Entrada</span>
+                <span className="t-node-dot"></span>
               </div>
-              <div className="format-pill-item">
-                <span className="check-icon">✓</span>
-                <strong>Bordes automáticos:</strong> Cuadrícula formal sólida `#e2e8f0` para legibilidad ejecutiva.
+              <h4 className="t-node-title">Formulario / Archivo de Requerimientos</h4>
+              <p className="t-node-desc">Captura documentos .docx, .pdf, .txt o criterios de aceptación en texto plano.</p>
+            </div>
+
+            <div className={`tree-connector-v ${activeStep > 1 ? 'active' : ''}`}>
+              <span className="v-line"></span>
+              <span className="v-arrow">▼</span>
+            </div>
+
+            {/* Nodo 2: Motor IA */}
+            <div className={`tree-node-card ${activeStep >= 2 ? 'completed' : ''} ${activeStep === 2 && isRunning ? 'running' : ''}`}>
+              <div className="t-node-header">
+                <span className="t-node-badge ai">Motor IA Dual</span>
+                <span className="t-node-dot"></span>
               </div>
-              <div className="format-pill-item">
-                <span className="check-icon">✓</span>
-                <strong>Anchos por columna optimizados:</strong> Auto-dimensionamiento en píxeles para evitar textos truncados.
+              <h4 className="t-node-title">Gemini 1.5/2.0 + Fallback OpenRouter</h4>
+              <p className="t-node-desc">Descompone lógica funcional en escenarios BDD (Dado / Cuando / Entonces) con alta resiliencia.</p>
+            </div>
+
+            <div className={`tree-connector-v ${activeStep > 2 ? 'active' : ''}`}>
+              <span className="v-line"></span>
+              <span className="v-arrow">▼</span>
+            </div>
+
+            {/* Nodo 3: Parser Universal */}
+            <div className={`tree-node-card ${activeStep >= 3 ? 'completed' : ''} ${activeStep === 3 && isRunning ? 'running' : ''}`}>
+              <div className="t-node-header">
+                <span className="t-node-badge logic">Lógica de Datos</span>
+                <span className="t-node-dot"></span>
               </div>
-              <div className="format-pill-item">
-                <span className="check-icon">✓</span>
-                <strong>Zebra striping dinámico:</strong> Alternancia sutil de color de fondo entre filas para facilitar la lectura.
+              <h4 className="t-node-title">Parser Universal BDD (JSON Sanitizer)</h4>
+              <p className="t-node-desc">Extracción de JSON, sanitización estricta y ordenamiento de pasos numerados.</p>
+            </div>
+
+            <div className={`tree-connector-fork ${activeStep > 3 ? 'active' : ''}`}>
+              <div className="fork-line-left"></div>
+              <div className="fork-line-center"></div>
+              <div className="fork-line-right"></div>
+            </div>
+
+            {/* Nodos 4 en Paralelo: Create Sheet & Sync */}
+            <div className="tree-parallel-row">
+              <div className={`tree-node-card sub-card ${activeStep >= 4 ? 'completed' : ''} ${activeStep === 4 && isRunning ? 'running' : ''}`}>
+                <div className="t-node-header">
+                  <span className="t-node-badge sheets">Google Sheets API</span>
+                  <span className="t-node-dot"></span>
+                </div>
+                <h4 className="t-node-title">Create Sheet (Pestaña nueva)</h4>
+                <p className="t-node-desc">Crea una pestaña temática nombrada con el módulo y timestamp de ejecución.</p>
+              </div>
+
+              <div className={`tree-node-card sub-card ${activeStep >= 4 ? 'completed' : ''} ${activeStep === 4 && isRunning ? 'running' : ''}`}>
+                <div className="t-node-header">
+                  <span className="t-node-badge sheets">Google Sheets API</span>
+                  <span className="t-node-dot"></span>
+                </div>
+                <h4 className="t-node-title">Google Sheets Sync (11 Columnas)</h4>
+                <p className="t-node-desc">Inserción masiva de filas estructuradas en el esquema oficial de la matriz.</p>
+              </div>
+            </div>
+
+            <div className={`tree-connector-merge ${activeStep > 4 ? 'active' : ''}`}>
+              <div className="merge-line-left"></div>
+              <div className="merge-line-center"></div>
+              <div className="merge-line-right"></div>
+              <span className="v-arrow">▼</span>
+            </div>
+
+            {/* Nodo 5: batchUpdate API Formato */}
+            <div className={`tree-node-card final-node ${activeStep >= 5 ? 'completed' : ''} ${activeStep === 5 && isRunning ? 'running' : ''}`}>
+              <div className="t-node-header">
+                <span className="t-node-badge style">Formateo batchUpdate API</span>
+                <span className="t-node-dot"></span>
+              </div>
+              <h4 className="t-node-title">Aplicar Formato QA Corporativo</h4>
+              <p className="t-node-desc">Llamada batchUpdate de Google Sheets que aplica de forma atómica todas las reglas visuales.</p>
+
+              <div className="final-specs-list">
+                <span className="spec-tag">Encabezado temático pastel</span>
+                <span className="spec-tag">Bordes automáticos sólidos</span>
+                <span className="spec-tag">Anchos de columna optimizados</span>
+                <span className="spec-tag">Zebra striping dinámico</span>
               </div>
             </div>
           </div>

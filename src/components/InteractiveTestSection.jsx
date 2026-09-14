@@ -1,267 +1,452 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
-export default function InteractiveTestSection({ onOpenSheet }) {
-  const sampleModule = 'Autenticación y Seguridad';
-  const sampleCriteria = `1. Permitir inicio de sesión con correo y contraseña válidos redirigiendo al dashboard.
-2. Bloquear la cuenta tras 3 intentos fallidos con contraseña incorrecta y notificar por correo.
-3. Enlace de recuperación de contraseña que despacha un token con validez de 15 minutos.`;
+// URL oficial del Webhook de n8n configurada por el usuario
+const WEBHOOK_URL = "https://tu-n8n.com/webhook/generar-qa";
 
-  const [moduleInput, setModuleInput] = useState('');
-  const [criteriaInput, setCriteriaInput] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processStep, setProcessStep] = useState(0); // 0: idle, 1..4: steps, 5: done
-  const [activeTab, setActiveTab] = useState('auth');
+export default function InteractiveTestSection() {
+  const [targetWebhookUrl, setTargetWebhookUrl] = useState(WEBHOOK_URL);
+  const [isEditingUrl, setIsEditingUrl] = useState(false);
+  const [file, setFile] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [executionLogs, setExecutionLogs] = useState([]);
+  const [n8nResult, setN8nResult] = useState(null);
+  const [webhookError, setWebhookError] = useState(null);
+  const fileInputRef = useRef(null);
 
-  const handleLoadExample = () => {
-    setModuleInput(sampleModule);
-    setCriteriaInput(sampleCriteria);
+  // Carga de archivo de requerimientos de prueba
+  const handleLoadSampleFile = () => {
+    const sampleText = `MÓDULO: Autenticación y Seguridad
+CRITERIOS DE ACEPTACIÓN:
+1. Permitir inicio de sesión con correo y contraseña válidos redirigiendo al dashboard principal.
+2. Bloquear la cuenta tras 3 intentos fallidos con contraseña errónea y notificar por correo al usuario.
+3. Enlace de recuperación de contraseña que despacha un token criptográfico con validez estricta de 15 minutos.`;
+
+    const sampleBlob = new Blob([sampleText], { type: 'text/plain;charset=utf-8' });
+    const sampleFile = new File([sampleBlob], 'Requerimientos_Autenticacion_QA.txt', { type: 'text/plain' });
+
+    setFile({
+      name: 'Requerimientos_Autenticacion_QA.txt',
+      size: '1.2 KB',
+      rawFile: sampleFile,
+      isSample: true
+    });
+    setWebhookError(null);
+    setN8nResult(null);
   };
 
-  const handleRunProcess = () => {
-    if (!criteriaInput && !moduleInput) {
-      handleLoadExample();
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const dropped = e.dataTransfer.files[0];
+      setFile({
+        name: dropped.name,
+        size: `${(dropped.size / 1024).toFixed(1)} KB`,
+        rawFile: dropped,
+        isSample: false
+      });
+      setWebhookError(null);
+      setN8nResult(null);
     }
-    setIsProcessing(true);
-    setProcessStep(1);
+  };
 
-    const steps = [
-      { delay: 700, step: 2 },
-      { delay: 1500, step: 3 },
-      { delay: 2300, step: 4 },
-      { delay: 3100, step: 5 }
-    ];
+  const handleFileInputChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const selected = e.target.files[0];
+      setFile({
+        name: selected.name,
+        size: `${(selected.size / 1024).toFixed(1)} KB`,
+        rawFile: selected,
+        isSample: false
+      });
+      setWebhookError(null);
+      setN8nResult(null);
+    }
+  };
 
-    steps.forEach(({ delay, step }) => {
-      setTimeout(() => {
-        setProcessStep(step);
-        if (step === 5) {
-          setIsProcessing(false);
-        }
-      }, delay);
-    });
+  const handleRemoveFile = () => {
+    setFile(null);
+    setN8nResult(null);
+    setWebhookError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // DISPARO REAL AL WEBHOOK DE N8N
+  const handleTriggerN8n = async () => {
+    let currentFile = file;
+    if (!currentFile) {
+      handleLoadSampleFile();
+      currentFile = {
+        name: 'Requerimientos_Autenticacion_QA.txt',
+        size: '1.2 KB',
+        rawFile: new File(['MÓDULO: Autenticación y Seguridad\n1. Login válido con redirección\n2. Bloqueo 3 intentos'], 'Requerimientos_Autenticacion_QA.txt', { type: 'text/plain' }),
+        isSample: true
+      };
+    }
+
+    setIsSending(true);
+    setWebhookError(null);
+    setExecutionLogs([
+      `[${new Date().toLocaleTimeString()}] Iniciando petición HTTP POST hacia n8n...`,
+      `[${new Date().toLocaleTimeString()}] Destino: ${targetWebhookUrl}`,
+      `[${new Date().toLocaleTimeString()}] Empaquetando archivo "${currentFile.name}" en FormData...`
+    ]);
+
+    try {
+      const formData = new FormData();
+      if (currentFile.rawFile) {
+        formData.append('file', currentFile.rawFile);
+      }
+      formData.append('filename', currentFile.name);
+      formData.append('modulo', 'Autenticación y Seguridad');
+      formData.append('timestamp', new Date().toISOString());
+
+      // Petición real vía fetch a n8n
+      const response = await fetch(targetWebhookUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`El webhook de n8n respondió con código HTTP ${response.status} (${response.statusText})`);
+      }
+
+      setExecutionLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] Respuesta 200 OK recibida desde n8n.`
+      ]);
+
+      const contentType = response.headers.get('content-type') || '';
+
+      // Si n8n devuelve el archivo binario Excel generado por el workflow
+      if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('octet-stream')) {
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `Matriz_QA_${currentFile.name.replace(/\.[^/.]+$/, "")}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setN8nResult({
+          type: 'excel',
+          message: 'Archivo Excel generado por tu automatización en n8n descargado exitosamente.',
+          url: downloadUrl
+        });
+      } else {
+        // Si n8n devuelve un JSON con la URL de Google Sheets o el resultado
+        const json = await response.json();
+        setN8nResult({
+          type: 'json',
+          sheetUrl: json.sheetUrl || json.url || null,
+          data: json
+        });
+      }
+    } catch (err) {
+      console.warn('Error al contactar webhook de n8n:', err);
+      setWebhookError({
+        message: err.message || 'No se pudo contactar con el webhook de n8n.',
+        url: targetWebhookUrl
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
     <section className="interactive-test-section" id="como-probarlo">
       <div className="container">
         <div className="section-header-center">
-          <span className="section-kicker">Guía Interactiva</span>
-          <h2 className="section-title">¿Cómo Probar la Automatización?</h2>
+          <span className="section-kicker">Ejecución en Vivo con n8n</span>
+          <h2 className="section-title">Probar Automatización con tu Webhook de n8n</h2>
           <p className="section-subtitle">
-            Sigue estos 3 sencillos pasos para transformar criterios de aceptación en una hoja corporativa de Google Sheets en tiempo real.
+            El frontend despacha el archivo de requerimientos vía HTTP POST directamente a tu Webhook de n8n, donde tu pipeline procesa la IA y genera la hoja en Google Sheets.
           </p>
         </div>
 
-        {/* 3 Pasos Cards */}
-        <div className="steps-cards-grid">
-          {/* Paso 1 */}
-          <div className="step-card">
-            <div className="step-number-badge">Paso 1</div>
-            <h3 className="step-title">Ingresa los Requerimientos</h3>
-            <p className="step-desc">
-              Pega los criterios de aceptación en el formulario de prueba o carga el ejemplo predeterminado de autenticación.
-            </p>
-            <div className="step-tag">Criterios de Aceptación</div>
+        {/* Barra de Conexión del Webhook */}
+        <div className="n8n-connection-panel">
+          <div className="connection-status-left">
+            <div className="n8n-node-icon-small">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <circle cx="6" cy="12" r="3.5" fill="#ea4b71" />
+                <circle cx="18" cy="12" r="3.5" fill="#ea4b71" />
+                <path d="M9.5 12h5" stroke="#ea4b71" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="connection-text">
+              <span className="conn-label">Endpoint n8n Configurado:</span>
+              {!isEditingUrl ? (
+                <code className="conn-url">{targetWebhookUrl}</code>
+              ) : (
+                <input 
+                  type="url" 
+                  className="conn-url-input"
+                  value={targetWebhookUrl}
+                  onChange={(e) => setTargetWebhookUrl(e.target.value)}
+                  placeholder="http://localhost:5678/webhook/generar-qa"
+                />
+              )}
+            </div>
           </div>
 
-          {/* Paso 2 */}
-          <div className="step-card">
-            <div className="step-number-badge">Paso 2</div>
-            <h3 className="step-title">Procesamiento Inteligente</h3>
-            <p className="step-desc">
-              El motor analiza la lógica de negocio, descompone casos positivos, negativos y de borde, y orquesta la inserción en Google Sheets.
-            </p>
-            <div className="step-tag">Gemini + n8n Engine</div>
-          </div>
-
-          {/* Paso 3 */}
-          <div className="step-card">
-            <div className="step-number-badge">Paso 3</div>
-            <h3 className="step-title">Revisa el Resultado en Tiempo Real</h3>
-            <p className="step-desc">
-              Abre la hoja de cálculo generada: pestaña nueva con timestamp, autoajuste de ancho y paleta pastel dinámica.
-            </p>
-            <div className="step-tag">Google Sheets batchUpdate</div>
+          <div className="connection-actions-right">
+            {!isEditingUrl ? (
+              <button 
+                type="button" 
+                className="btn-conn-toggle"
+                onClick={() => setIsEditingUrl(true)}
+              >
+                Cambiar URL
+              </button>
+            ) : (
+              <button 
+                type="button" 
+                className="btn-conn-save"
+                onClick={() => setIsEditingUrl(false)}
+              >
+                Guardar URL
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Formulario y Consola Interactiva */}
+        {/* Caja de Interacción Principal */}
         <div className="interactive-tester-box">
+          {/* Panel Izquierdo: Carga de Archivo */}
           <div className="tester-form-panel">
             <div className="tester-panel-header">
-              <h4>Consola de Prueba de Requerimientos</h4>
+              <div className="panel-step-badge">Paso 1</div>
+              <h4 className="panel-step-title">Carga tu Archivo de Requerimientos</h4>
               <button 
                 type="button" 
-                className="btn-link-action"
-                onClick={handleLoadExample}
+                className="btn-link-load-sample"
+                onClick={handleLoadSampleFile}
               >
-                📋 Cargar Ejemplo Rápido
+                Cargar Archivo de Prueba
               </button>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Módulo Funcional / Feature</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                placeholder="Ej: Autenticación y Seguridad"
-                value={moduleInput}
-                onChange={(e) => setModuleInput(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Criterios de Aceptación o Historias de Usuario</label>
-              <textarea 
-                className="form-input form-textarea" 
-                rows="6"
-                placeholder="Pega aquí los criterios de aceptación (Dado/Cuando/Entonces o viñetas)..."
-                value={criteriaInput}
-                onChange={(e) => setCriteriaInput(e.target.value)}
-              ></textarea>
-            </div>
-
-            <button 
-              type="button" 
-              className="pill-button pill-button-primary full-width"
-              onClick={handleRunProcess}
-              disabled={isProcessing}
+            {/* Zona Drag & Drop */}
+            <div 
+              className={`file-dropzone ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => !file && fileInputRef.current && fileInputRef.current.click()}
             >
-              {isProcessing ? 'Procesando en n8n...' : '⚡ Generar Matriz de Pruebas en Google Sheets'}
-            </button>
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                accept=".docx,.pdf,.txt,.md,.json,.csv"
+                onChange={handleFileInputChange}
+              />
 
-            {/* Estado del Procesamiento */}
-            {processStep > 0 && (
-              <div className="processing-status-box">
-                <div className="status-timeline">
-                  <div className={`status-node ${processStep >= 1 ? 'active' : ''}`}>
-                    <span className="dot"></span>
-                    <span>1. Ingesta n8n</span>
+              {!file ? (
+                <div className="dropzone-empty-state">
+                  <div className="dropzone-icon-svg">
+                    <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#ea4b71" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="12" y1="18" x2="12" y2="12"></line>
+                      <polyline points="9 15 12 12 15 15"></polyline>
+                    </svg>
                   </div>
-                  <div className={`status-node ${processStep >= 2 ? 'active' : ''}`}>
-                    <span className="dot"></span>
-                    <span>2. Inferencia Gemini</span>
-                  </div>
-                  <div className={`status-node ${processStep >= 3 ? 'active' : ''}`}>
-                    <span className="dot"></span>
-                    <span>3. Parser 11 Cols</span>
-                  </div>
-                  <div className={`status-node ${processStep >= 4 ? 'active' : ''}`}>
-                    <span className="dot"></span>
-                    <span>4. batchUpdate Sheet</span>
-                  </div>
+                  <p className="dropzone-main-text">
+                    <strong>Arrastra tu archivo aquí</strong> o haz clic para seleccionarlo
+                  </p>
+                  <p className="dropzone-sub-text">
+                    Formatos soportados: .DOCX, .PDF, .TXT, .MD, .JSON
+                  </p>
                 </div>
-                {processStep === 5 && (
-                  <div className="success-banner">
-                    <span>✓ Matriz generada con éxito en Google Sheets con formato pastel y zebra striping.</span>
+              ) : (
+                <div className="dropzone-file-selected" onClick={(e) => e.stopPropagation()}>
+                  <div className="selected-file-badge-tech">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="selected-file-info">
+                    <div className="selected-file-name">{file.name}</div>
+                    <div className="selected-file-meta">
+                      <span>{file.size}</span>
+                      <span className="file-pill-tag">{file.isSample ? 'Ejemplo Precargado' : 'Archivo Local'}</span>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-remove-file-round"
+                    onClick={handleRemoveFile}
+                    title="Quitar archivo"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Botón de Disparo hacia n8n */}
+            <div style={{ marginTop: '20px' }}>
+              <button 
+                type="button" 
+                className="btn-trigger-n8n"
+                onClick={handleTriggerN8n}
+                disabled={isSending}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                <span>{isSending ? 'Enviando petición a n8n...' : 'Disparar Automatización en n8n (HTTP POST)'}</span>
+              </button>
+            </div>
           </div>
 
-          {/* Vista Previa de la Hoja de Google Sheets Generada */}
-          <div className="sheets-preview-panel">
-            <div className="sheets-chrome-bar">
-              <div className="sheets-title-row">
-                <div className="sheets-doc-icon">📊</div>
-                <div>
-                  <div className="sheets-doc-name">Matriz_QA_Corporativa_2026.xlsx</div>
-                  <div className="sheets-doc-meta">Última edición hace unos segundos (n8n Service Account)</div>
+          {/* Panel Derecho: Estado de Ejecución de n8n */}
+          <div className="tester-status-panel">
+            <div className="status-panel-header">
+              <div className="n8n-status-title">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="#ea4b71">
+                  <circle cx="6" cy="12" r="3.5" fill="#ea4b71" />
+                  <circle cx="18" cy="12" r="3.5" fill="#ea4b71" />
+                  <path d="M9.5 12h5" stroke="#ea4b71" strokeWidth="2.5" />
+                </svg>
+                <span>Pipeline de Ejecución en n8n</span>
+              </div>
+              <span className={`status-state-pill ${isSending ? 'running' : n8nResult ? 'completed' : 'idle'}`}>
+                {isSending ? 'Ejecutando...' : n8nResult ? 'Completado' : 'Esperando Disparo'}
+              </span>
+            </div>
+
+            <div className="status-panel-body">
+              {/* Si hubo error al contactar el webhook */}
+              {webhookError ? (
+                <div className="n8n-error-box">
+                  <div className="error-badge-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ef4444" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <strong>No se pudo conectar con el Webhook de n8n</strong>
+                  </div>
+                  <p className="error-text">
+                    La URL <code>{webhookError.url}</code> no respondió o el navegador bloqueó la petición por CORS.
+                  </p>
+                  <div className="error-steps">
+                    <strong>Pasos para conectar tu n8n:</strong>
+                    <ol>
+                      <li>Asegúrate de que n8n esté corriendo con el nodo <strong>Webhook</strong> activo en modo de escucha.</li>
+                      <li>Si n8n está en tu máquina local (`localhost:5678`), introduce arriba tu URL o usa un túnel seguro con <code>ngrok http 5678</code>.</li>
+                      <li>Haz clic arriba en <strong>"Cambiar URL"</strong> para actualizar tu webhook activo.</li>
+                    </ol>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-retry-conn"
+                    onClick={handleTriggerN8n}
+                  >
+                    Reintentar Conexión
+                  </button>
                 </div>
-              </div>
-              <button 
-                type="button" 
-                className="pill-button pill-button-secondary"
-                style={{ fontSize: '11.5px', padding: '5px 12px' }}
-                onClick={onOpenSheet}
-              >
-                Pantalla Completa ↗
-              </button>
-            </div>
+              ) : n8nResult ? (
+                /* Éxito desde n8n */
+                <div className="n8n-success-box">
+                  <div className="success-header">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#10b981" strokeWidth="2.5">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    <span>Flujo Procesado Exitosamente por n8n</span>
+                  </div>
 
-            <div className="sheets-formula-bar">
-              <span className="fx-label">fx</span>
-              <span className="formula-text">=ESTANDAR_QA_BDD(A2:K4, "Paleta_Pastel_Auto")</span>
-            </div>
+                  <p className="success-desc">
+                    Tu automatización en n8n generó la matriz de pruebas con el estándar de 11 columnas.
+                  </p>
 
-            {/* Spreadsheet Table View */}
-            <div className="sheet-grid-container">
-              <table className="sheet-table">
-                <thead>
-                  <tr className="sheet-pastel-header">
-                    <th className="row-num-th"></th>
-                    <th>A: Id</th>
-                    <th>B: Módulo</th>
-                    <th>C: Descripción</th>
-                    <th>D: Fecha</th>
-                    <th>E: Caso de Prueba</th>
-                    <th>F: Precondiciones</th>
-                    <th>G: Pasos (Entrada)</th>
-                    <th>H: Resultado Esperado</th>
-                    <th>I: Ambiente</th>
-                    <th>J: Proc. Especiales</th>
-                    <th>K: Postcondición</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="sheet-row">
-                    <td className="row-num-td">2</td>
-                    <td className="cell-id">CP-0001</td>
-                    <td>Autenticación y Seguridad</td>
-                    <td>Validar login exitoso con credenciales válidas</td>
-                    <td>14/09/2026</td>
-                    <td><strong>Inicio de sesión exitoso y redirección</strong></td>
-                    <td>Usuario registrado con estado 'Activo' en base de datos.</td>
-                    <td>1. Ir a /login<br/>2. Ingresar usuario válido<br/>3. Ingresar clave correcta<br/>4. Clic en 'Ingresar'</td>
-                    <td>HTTP 200, JWT emitido en cookie y redirección al Dashboard.</td>
-                    <td>Staging v2.4, PostgreSQL, Auth Gateway</td>
-                    <td>Ninguno</td>
-                    <td>Sesión activa en Redis con TTL de 3600s.</td>
-                  </tr>
-                  <tr className="sheet-row zebra">
-                    <td className="row-num-td">3</td>
-                    <td className="cell-id">CP-0002</td>
-                    <td>Autenticación y Seguridad</td>
-                    <td>Validar bloqueo de cuenta tras 3 intentos fallidos</td>
-                    <td>14/09/2026</td>
-                    <td><strong>Bloqueo preventivo por fuerza bruta</strong></td>
-                    <td>Cuenta existente con 0 fallos registrados.</td>
-                    <td>1. Ir a /login<br/>2. Ingresar contraseña errónea 3 veces seguidas</td>
-                    <td>HTTP 423 Locked, bloqueo temporal de cuenta y correo de advertencia.</td>
-                    <td>Staging v2.4, Servicio SMTP</td>
-                    <td>Limpiar contador Redis antes de test</td>
-                    <td>Cuenta bloqueada temporalmente por 15 min.</td>
-                  </tr>
-                  <tr className="sheet-row">
-                    <td className="row-num-td">4</td>
-                    <td className="cell-id">CP-0003</td>
-                    <td>Autenticación y Seguridad</td>
-                    <td>Validar generación de token de recuperación</td>
-                    <td>14/09/2026</td>
-                    <td><strong>Recuperación de contraseña vía token</strong></td>
-                    <td>Usuario registrado con email institucional accesible.</td>
-                    <td>1. Clic en 'Olvidé contraseña'<br/>2. Ingresar email registrado<br/>3. Enviar</td>
-                    <td>HTTP 200, correo recibido con enlace y token con vigencia de 15 min.</td>
-                    <td>Staging v2.4, Servicio SMTP</td>
-                    <td>Verificar recepción en buzón MailHog</td>
-                    <td>Token temporal almacenado con expiración 15m.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                  {n8nResult.sheetUrl && (
+                    <a 
+                      href={n8nResult.sheetUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="btn-open-google-sheet"
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                      </svg>
+                      <span>Abrir Hoja en Google Sheets</span>
+                    </a>
+                  )}
 
-            {/* Sheets Bottom Tab Bar */}
-            <div className="sheets-tabs-bar">
-              <div className="sheets-tab active">
-                <span className="tab-color-mark" style={{ background: '#f8d7da' }}></span>
-                <span>Autenticacion_140926</span>
-              </div>
-              <div className="sheets-tab">
-                <span className="tab-color-mark" style={{ background: '#d1e7dd' }}></span>
-                <span>Checkout_120926</span>
-              </div>
-              <div className="sheets-tab add-tab">+</div>
+                  <div className="terminal-json-output">
+                    <div className="terminal-header">Respuesta de n8n</div>
+                    <pre>{JSON.stringify(n8nResult.data || { status: 'OK', message: 'Matriz creada por n8n' }, null, 2)}</pre>
+                  </div>
+                </div>
+              ) : (
+                /* Estado Inicial / Espera */
+                <div className="n8n-standby-view">
+                  <div className="standby-svg-icon">
+                    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#ea4b71" strokeWidth="1.8">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                  </div>
+                  <h4 className="standby-title">Esperando Disparo de Automatización</h4>
+                  <p className="standby-desc">
+                    Al pulsar <strong>"Disparar Automatización en n8n"</strong>, el archivo viaja al Webhook. Tu flujo en n8n ejecutará el modelo de lenguaje (Gemini), estructurará las 11 columnas y creará la hoja en Google Sheets.
+                  </p>
+
+                  <div className="standby-pipeline-nodes">
+                    <div className="standby-step">
+                      <span className="step-num">1</span>
+                      <span className="step-text">Webhook recibe FormData</span>
+                    </div>
+                    <div className="standby-step">
+                      <span className="step-num">2</span>
+                      <span className="step-text">Gemini infiere casos BDD</span>
+                    </div>
+                    <div className="standby-step">
+                      <span className="step-num">3</span>
+                      <span className="step-text">Google Sheets API batchUpdate</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Registro de Petición HTTP */}
+              {executionLogs.length > 0 && (
+                <div className="http-console-box">
+                  <div className="console-bar">
+                    <span className="console-dot red"></span>
+                    <span className="console-dot yellow"></span>
+                    <span className="console-dot green"></span>
+                    <span className="console-title">Log de Red HTTP POST</span>
+                  </div>
+                  <div className="console-lines">
+                    {executionLogs.map((log, i) => (
+                      <div key={i} className="log-row">{log}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
