@@ -82,12 +82,13 @@ CRITERIOS DE ACEPTACIÓN:
   // DISPARO REAL AL WEBHOOK DE N8N
   const handleTriggerN8n = async () => {
     let currentFile = file;
-    if (!currentFile) {
+    if (!currentFile || !currentFile.rawFile) {
       handleLoadSampleFile();
+      const defaultBlob = new Blob([`MÓDULO: Autenticación y Seguridad\n1. Login válido con redirección\n2. Bloqueo 3 intentos`], { type: 'text/plain;charset=utf-8' });
       currentFile = {
         name: 'Requerimientos_Autenticacion_QA.txt',
         size: '1.2 KB',
-        rawFile: new File(['MÓDULO: Autenticación y Seguridad\n1. Login válido con redirección\n2. Bloqueo 3 intentos'], 'Requerimientos_Autenticacion_QA.txt', { type: 'text/plain' }),
+        rawFile: new File([defaultBlob], 'Requerimientos_Autenticacion_QA.txt', { type: 'text/plain' }),
         isSample: true
       };
     }
@@ -96,26 +97,27 @@ CRITERIOS DE ACEPTACIÓN:
     setWebhookError(null);
     setExecutionLogs([
       `[${new Date().toLocaleTimeString()}] Conectando con n8n en: ${WEBHOOK_URL}...`,
-      `[${new Date().toLocaleTimeString()}] Empaquetando archivo "${currentFile.name}" en FormData...`
+      `[${new Date().toLocaleTimeString()}] Empaquetando archivo "${currentFile.name}" en FormData con clave 'file'...`
     ]);
 
     try {
+      // El envío con archivo usando FormData NO debe llevar 'Content-Type' manual,
+      // el navegador se encarga de ponerlo con su boundary automáticamente.
       const formData = new FormData();
-      if (currentFile.rawFile) {
-        formData.append('file', currentFile.rawFile);
-      }
+      formData.append('file', currentFile.rawFile); // Coincide con 'Field Name for Binary Data' en n8n
       formData.append('filename', currentFile.name);
       formData.append('modulo', 'Autenticación y Seguridad');
       formData.append('timestamp', new Date().toISOString());
 
-      // Petición real vía fetch a n8n
-      const response = await fetch(WEBHOOK_URL, {
+      // Petición POST directa a n8n sin headers de Content-Type
+      const respuesta = await fetch(WEBHOOK_URL, {
         method: 'POST',
-        body: formData,
+        body: formData
+        // ¡OJO! No ponemos headers: { 'Content-Type': ... }, el navegador asigna el boundary
       });
 
-      if (!response.ok) {
-        throw new Error(`El webhook de n8n respondió con código HTTP ${response.status} (${response.statusText})`);
+      if (!respuesta.ok) {
+        throw new Error(`El webhook de n8n respondió con código HTTP ${respuesta.status} (${respuesta.statusText})`);
       }
 
       setExecutionLogs(prev => [
@@ -123,11 +125,11 @@ CRITERIOS DE ACEPTACIÓN:
         `[${new Date().toLocaleTimeString()}] Respuesta 200 OK recibida desde n8n.`
       ]);
 
-      const contentType = response.headers.get('content-type') || '';
+      const contentType = respuesta.headers.get('content-type') || '';
 
       // Si n8n devuelve el archivo binario Excel generado por el workflow
       if (contentType.includes('spreadsheet') || contentType.includes('excel') || contentType.includes('octet-stream')) {
-        const blob = await response.blob();
+        const blob = await respuesta.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
@@ -143,11 +145,13 @@ CRITERIOS DE ACEPTACIÓN:
         });
       } else {
         // Si n8n devuelve un JSON con la URL de Google Sheets o el resultado
-        const json = await response.json();
+        const data = await respuesta.json();
+        console.log('Resultado n8n:', data);
+
         setN8nResult({
           type: 'json',
-          sheetUrl: json.sheetUrl || json.url || null,
-          data: json
+          sheetUrl: data.sheetUrl || data.url || null,
+          data: data
         });
       }
     } catch (err) {
@@ -367,7 +371,7 @@ CRITERIOS DE ACEPTACIÓN:
                   <div className="standby-pipeline-nodes">
                     <div className="standby-step">
                       <span className="step-num">1</span>
-                      <span className="step-text">Webhook recibe FormData</span>
+                      <span className="step-text">Webhook recibe FormData con clave 'file'</span>
                     </div>
                     <div className="standby-step">
                       <span className="step-num">2</span>
