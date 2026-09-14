@@ -1,8 +1,65 @@
 import React, { useState, useRef } from 'react';
+import mammoth from 'mammoth';
+import * as pdfjsLib from 'pdfjs-dist';
+import * as XLSX from 'xlsx';
 import { exportCasesToExcel, exportCasesToCsv } from '../utils/exportExcel';
+
+// Configuración obligatoria para que el lector de PDF funcione en el navegador
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 // URL oficial del Webhook de n8n configurada por el usuario
 const WEBHOOK_URL = "http://localhost:5678/webhook/generar-qa";
+
+// Función extractora: detecta la extensión del archivo y aplica la herramienta correcta (.docx, .pdf, .xlsx, .txt, .csv)
+const extraerTextoDelArchivo = async (file) => {
+  const extension = file.name.split('.').pop().toLowerCase();
+
+  // 1. Si es un archivo de texto plano o CSV nativo
+  if (extension === 'txt' || extension === 'csv' || extension === 'md' || extension === 'json') {
+    return await file.text();
+  }
+
+  // 2. Si es un Excel (.xlsx o .xls)
+  if (extension === 'xlsx' || extension === 'xls') {
+    const arrayBuffer = await file.arrayBuffer();
+    // Leemos el libro de Excel en memoria
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    let textoCompleto = '';
+    
+    // Recorremos todas las hojas (pestañas) que tenga el Excel
+    workbook.SheetNames.forEach(sheetName => {
+      const worksheet = workbook.Sheets[sheetName];
+      // Convertimos cada hoja a texto (CSV) para que la IA lo entienda fácil
+      textoCompleto += XLSX.utils.sheet_to_csv(worksheet) + '\n\n';
+    });
+    
+    return textoCompleto;
+  }
+
+  // 3. Si es un archivo de Word (.docx)
+  if (extension === 'docx') {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  }
+
+  // 4. Si es un PDF
+  if (extension === 'pdf') {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let textoCompleto = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const textoPagina = textContent.items.map(item => item.str).join(' ');
+      textoCompleto += textoPagina + '\n';
+    }
+    return textoCompleto;
+  }
+
+  throw new Error("Formato de archivo no soportado. Sube un Excel, PDF, DOCX, TXT o CSV.");
+};
 
 export default function InteractiveTestSection({ onCasesGenerated, onScrollToMatrix }) {
   const [file, setFile] = useState(null);
@@ -98,9 +155,24 @@ CRITERIOS DE ACEPTACIÓN:
     setIsSending(true);
     setWebhookError(null);
     setExecutionLogs([
-      `[${new Date().toLocaleTimeString()}] Leyendo archivo "${currentFile.name}" y convirtiendo a Base64...`,
+      `[${new Date().toLocaleTimeString()}] Extrayendo texto de "${currentFile.name}" (Word, PDF, Excel, TXT, CSV)...`,
       `[${new Date().toLocaleTimeString()}] Conectando con n8n en: ${WEBHOOK_URL}...`
     ]);
+
+    let textoExtraido = '';
+    try {
+      textoExtraido = await extraerTextoDelArchivo(currentFile.rawFile);
+      setExecutionLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] Contenido de texto extraído exitosamente (${textoExtraido.length} caracteres).`
+      ]);
+    } catch (extractErr) {
+      console.warn("Aviso al extraer texto plano:", extractErr);
+      setExecutionLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] Aviso: se procesará archivo mediante Base64.`
+      ]);
+    }
 
     const reader = new FileReader();
 
@@ -109,12 +181,15 @@ CRITERIOS DE ACEPTACIÓN:
       const base64Data = event.target.result.split(',')[1];
       const mimeType = currentFile.rawFile.type || 'text/plain';
 
-      // Armamos un JSON limpio con los datos
+      // Armamos un JSON limpio con los datos y el texto extraído
       const payload = {
         filename: currentFile.name,
         modulo: 'Autenticación y Seguridad',
         mimeType: mimeType,
-        fileData: base64Data // Aquí va el archivo convertido
+        fileData: base64Data, // Archivo convertido a Base64
+        texto: textoExtraido, // Texto limpio extraído de Word, PDF, Excel, TXT o CSV
+        contenido: textoExtraido,
+        content: textoExtraido
       };
 
       try {
@@ -270,7 +345,7 @@ CRITERIOS DE ACEPTACIÓN:
                 type="file" 
                 ref={fileInputRef}
                 style={{ display: 'none' }}
-                accept=".docx,.pdf,.txt,.md,.json,.csv"
+                accept=".docx,.pdf,.xlsx,.xls,.txt,.md,.json,.csv"
                 onChange={handleFileInputChange}
               />
 
@@ -288,7 +363,7 @@ CRITERIOS DE ACEPTACIÓN:
                     <strong>Arrastra tu archivo aquí</strong> o haz clic para seleccionar
                   </p>
                   <p className="dropzone-sub-text">
-                    Formatos soportados: .DOCX, .PDF, .TXT, .MD, .JSON
+                    Formatos soportados: .DOCX, .PDF, .XLSX, .TXT, .MD, .CSV
                   </p>
                 </div>
               ) : (
