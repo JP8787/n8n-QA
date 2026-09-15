@@ -6,8 +6,8 @@ import * as XLSX from 'xlsx';
 // Configuración obligatoria para que el lector de PDF funcione en el navegador
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-// URL oficial del Webhook de n8n configurada (Túnel HTTPS seguro de Cloudflare para acceso desde celulares y GitHub Pages)
-const DEFAULT_WEBHOOK_URL = "https://turbo-southwest-detect-downloaded.trycloudflare.com/webhook/generar-qa";
+// URL oficial del Webhook de n8n configurada (Túnel HTTPS seguro de Cloudflare para acceso público desde celulares y GitHub Pages)
+const DEFAULT_WEBHOOK_URL = "https://academic-expensive-dir-luis.trycloudflare.com/webhook/generar-qa";
 
 // Validación preventiva y profunda: Analiza si el documento realmente contiene criterios de aceptación y requerimientos de software
 const validarCriteriosDeAceptacion = (currentFile, extractedText) => {
@@ -135,59 +135,37 @@ const validarCriteriosDeAceptacion = (currentFile, extractedText) => {
   return { isValid: true, matchedCount: matchedQASignals.length };
 };
 
-// Diagnóstico inteligente de errores de red o comunicación
+// Diagnóstico inteligente de errores de red o comunicación (adaptado para visitantes y evaluadores públicos)
 const diagnoseError = (err, currentFile, extractedText, currentWebhookUrl) => {
-  const isMobile = typeof window !== 'undefined' && 
-    (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
-  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const isLocalhostUrl = currentWebhookUrl.includes('localhost') || currentWebhookUrl.includes('127.0.0.1');
 
-  // 1. Caso: Navegación desde Celular intentando conectar a localhost
-  if (isMobile && isLocalhostUrl) {
+  // Si aún tuviese una dirección local por alguna razón
+  if (isLocalhostUrl) {
     return {
-      category: 'mobile',
-      badge: 'Dispositivo Móvil / Celular',
+      category: 'localhost',
+      badge: 'Conexión a Nube Requerida',
       badgeColor: 'amber',
-      title: 'Estás probando desde un celular o dispositivo externo',
-      desc: 'Tu servidor de n8n está instalado en tu computadora personal (`localhost:5678`). Cuando pulsas el botón desde tu celular, este intenta buscar n8n dentro del propio teléfono (donde no está instalado), por lo que no puede comunicarse.',
+      title: 'El servicio está configurado para la nube pública',
+      desc: 'Para que cualquier visitante o reclutador pueda probar la automatización por internet, la conexión se realiza a través del túnel público seguro de Cloudflare.',
       solutions: [
-        'La opción más fácil y recomendada: Abre este enlace directamente desde el navegador de tu computadora donde tienes n8n abierto.',
-        'O asegúrate de que el túnel seguro de Cloudflare o ngrok esté activo en tu computadora.'
-      ],
-      allowEditUrl: false
+        'Pulsa el botón "Reintentar" para conectar automáticamente con el webhook en la nube.',
+        'Explora la matriz interactiva de 11 columnas y la arquitectura del flujo en esta misma página.'
+      ]
     };
   }
 
-  // 2. Caso: Bloqueo de Navegador HTTPS a HTTP local (Mixed Content en GitHub Pages)
-  if (isHttps && isLocalhostUrl) {
-    return {
-      category: 'https',
-      badge: 'Seguridad del Navegador',
-      badgeColor: 'amber',
-      title: 'El navegador bloqueó la llamada local por seguridad',
-      desc: 'Estás visitando la página desde un enlace seguro HTTPS (GitHub Pages). Por normas de seguridad internacionales, los navegadores impiden que una página HTTPS envíe datos a una dirección HTTP local sin cifrar (`http://localhost:5678`).',
-      solutions: [
-        'Para probar tu n8n local en esta computadora, ejecuta el proyecto localmente (http://localhost:5173).',
-        'O mantén activo tu túnel seguro HTTPS de Cloudflare en tu terminal.'
-      ],
-      allowEditUrl: false
-    };
-  }
-
-  // 3. Caso: Servidor n8n apagado o no responde en la PC
+  // Caso: Servidor n8n en vivo temporalmente inactivo, apagado o en pausa
   return {
     category: 'network',
-    badge: 'Servidor n8n Desconectado',
-    badgeColor: 'rose',
-    title: 'No se pudo conectar con tu flujo en n8n',
-    desc: 'No recibimos respuesta del túnel o servidor de n8n. Esto ocurre comúnmente cuando n8n no está iniciado en la terminal, el flujo no está activo o se cerró la ventana de Cloudflare.',
+    badge: 'Servicio en Vivo Temporalmente en Pausa',
+    badgeColor: 'amber',
+    title: 'El servicio de automatización en vivo no está disponible en este momento',
+    desc: 'La conexión con el webhook del pipeline en la nube no recibió respuesta. Al ser una demostración en vivo vinculada a la infraestructura personal de n8n del autor, el servidor o el túnel público pueden encontrarse temporalmente apagados o en pausa.',
     solutions: [
-      'Verifica que n8n esté ejecutándose en tu terminal (comando: `n8n start`).',
-      'Asegúrate de que la ventana de Cloudflare Tunnel siga abierta en tu barra de tareas.',
-      'Abre n8n en tu navegador (http://localhost:5678) y confirma que el workflow tenga el switch "Active" encendido o esté en modo "Test step".',
-      'Confirma que el nodo Webhook tenga el método POST y la ruta "generar-qa".'
-    ],
-    allowEditUrl: false
+      'Pulsa el botón "Reintentar" por si se trató de una intermitencia momentánea de conexión a la nube.',
+      'Explora toda la demostración interactiva en esta landing: interactúa con la Matriz QA oficial de 11 columnas en la sección superior y revisa la arquitectura del pipeline.',
+      'Si deseas una demostración en vivo personalizada con tus propios requerimientos de software, contacta al autor para encender la instancia de n8n en tiempo real.'
+    ]
   };
 };
 
@@ -289,22 +267,21 @@ export default function InteractiveTestSection({ onCasesGenerated, onScrollToMat
   const [webhookUrl, setWebhookUrl] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('n8n_custom_webhook_url');
-      if (saved && !saved.includes('localhost:5678') && !saved.includes('sol-florida-missing-vista')) {
+      if (
+        saved && 
+        !saved.includes('localhost') && 
+        !saved.includes('sol-florida') && 
+        !saved.includes('turbo-southwest') &&
+        saved.includes('academic-expensive-dir-luis')
+      ) {
         return saved;
       }
+      localStorage.setItem('n8n_custom_webhook_url', DEFAULT_WEBHOOK_URL);
       return DEFAULT_WEBHOOK_URL;
     }
     return DEFAULT_WEBHOOK_URL;
   });
-  const [showUrlConfig, setShowUrlConfig] = useState(false);
   const fileInputRef = useRef(null);
-
-  const handleUpdateWebhookUrl = (newUrl) => {
-    setWebhookUrl(newUrl);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('n8n_custom_webhook_url', newUrl);
-    }
-  };
 
   // Carga de archivo de requerimientos de prueba
   const handleLoadSampleFile = () => {
@@ -769,20 +746,6 @@ CRITERIOS DE ACEPTACIÓN:
                       </button>
                     )}
 
-                    {webhookError.allowEditUrl && (
-                      <button
-                        type="button"
-                        className="btn-friendly-action-config"
-                        onClick={() => setShowUrlConfig(!showUrlConfig)}
-                      >
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="3"></circle>
-                          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
-                        <span>{showUrlConfig ? 'Cerrar Ajustes de Conexión' : 'Configurar IP o URL de n8n'}</span>
-                      </button>
-                    )}
-
                     <button 
                       type="button" 
                       className="btn-friendly-retry"
@@ -795,32 +758,6 @@ CRITERIOS DE ACEPTACIÓN:
                       <span>Reintentar</span>
                     </button>
                   </div>
-
-                  {/* Sección desplegable para ajustar IP / URL dentro de la misma alerta */}
-                  {showUrlConfig && (
-                    <div className="friendly-url-config-section">
-                      <label className="url-config-label">
-                        URL de Webhook n8n (puedes ingresar la IP local de tu PC, ej: <code>http://192.168.1.15:5678/webhook/generar-qa</code>):
-                      </label>
-                      <div className="url-config-input-group">
-                        <input 
-                          type="text" 
-                          className="url-config-input"
-                          value={webhookUrl}
-                          onChange={(e) => handleUpdateWebhookUrl(e.target.value)}
-                          placeholder="http://localhost:5678/webhook/generar-qa"
-                        />
-                        <button 
-                          type="button"
-                          className="btn-reset-default-url"
-                          onClick={() => handleUpdateWebhookUrl(DEFAULT_WEBHOOK_URL)}
-                          title="Restaurar a localhost:5678"
-                        >
-                          Restaurar
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : n8nResult ? (
                 /* Éxito desde n8n: Card de Alto Impacto con Descarga y Vista */
@@ -917,7 +854,7 @@ CRITERIOS DE ACEPTACIÓN:
                   </div>
                   <h4 className="standby-title">Listo para recibir el archivo</h4>
                   <p className="standby-desc">
-                    Al pulsar <strong>"Disparar Automatización en n8n"</strong>, el archivo viaja convertido en Base64 mediante JSON a tu webhook local (<code>localhost:5678</code>). Tu flujo ejecutará el modelo de lenguaje (Gemini), estructurará las 11 columnas y la matriz estará disponible de inmediato para descarga y previsualización.
+                    Al pulsar <strong>"Disparar Automatización en n8n"</strong>, el archivo viaja mediante JSON al webhook del pipeline en la nube. El flujo ejecuta el modelo de lenguaje (Gemini), estructura las 11 columnas oficiales y genera la matriz QA lista para descarga en Excel y previsualización instantánea.
                   </p>
 
                   <div className="standby-pipeline-nodes">
@@ -927,7 +864,7 @@ CRITERIOS DE ACEPTACIÓN:
                     </div>
                     <div className="standby-step">
                       <span className="step-num">2</span>
-                      <span className="step-text">POST JSON con payload a tu Webhook</span>
+                      <span className="step-text">POST JSON con payload al Webhook en la nube</span>
                     </div>
                     <div className="standby-step">
                       <span className="step-num">3</span>
