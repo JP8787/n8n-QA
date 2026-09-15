@@ -6,8 +6,8 @@ import * as XLSX from 'xlsx';
 // Configuración obligatoria para que el lector de PDF funcione en el navegador
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-// URL oficial del Webhook de n8n configurada por el usuario
-const DEFAULT_WEBHOOK_URL = "http://localhost:5678/webhook/generar-qa";
+// URL oficial del Webhook de n8n configurada (Túnel HTTPS seguro de Cloudflare para acceso desde celulares y GitHub Pages)
+const DEFAULT_WEBHOOK_URL = "https://sol-florida-missing-vista.trycloudflare.com/webhook/generar-qa";
 
 // Diagnóstico inteligente de errores para que cualquier persona entienda qué ocurrió sin tecnicismos
 const diagnoseError = (err, currentFile, extractedText, currentWebhookUrl) => {
@@ -164,7 +164,11 @@ export default function InteractiveTestSection({ onCasesGenerated, onScrollToMat
   const [webhookError, setWebhookError] = useState(null);
   const [webhookUrl, setWebhookUrl] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('n8n_custom_webhook_url') || DEFAULT_WEBHOOK_URL;
+      const saved = localStorage.getItem('n8n_custom_webhook_url');
+      if (saved && !saved.includes('localhost:5678')) {
+        return saved;
+      }
+      return DEFAULT_WEBHOOK_URL;
     }
     return DEFAULT_WEBHOOK_URL;
   });
