@@ -898,7 +898,6 @@ CRITERIOS DE ACEPTACIÓN:
 
             <div className="toast-content">
               <div className="toast-badge">
-                <span className="badge-sparkle">✨</span>
                 <span>¡Automatización Completada con Éxito!</span>
               </div>
               <h4 className="toast-title">
