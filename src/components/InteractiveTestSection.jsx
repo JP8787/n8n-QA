@@ -210,11 +210,31 @@ const extraerTextoDelArchivo = async (file) => {
     return textoCompleto;
   }
 
-  // 3. Si es un archivo de Word (.docx)
+  // 3. Si es un archivo de Word (.docx o .doc)
   if (extension === 'docx') {
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer });
     return result.value;
+  }
+
+  if (extension === 'doc') {
+    const arrayBuffer = await file.arrayBuffer();
+    try {
+      const bytes = new Uint8Array(arrayBuffer);
+      let textChunk = '';
+      for (let i = 0; i < bytes.length; i++) {
+        const code = bytes[i];
+        if ((code >= 32 && code <= 126) || code === 10 || code === 13 || code >= 160) {
+          textChunk += String.fromCharCode(code);
+        } else if (textChunk.length > 0 && textChunk[textChunk.length - 1] !== ' ') {
+          textChunk += ' ';
+        }
+      }
+      const palabras = textChunk.match(/[a-zA-ZáéíóúñÁÉÍÓÚÑ0-9_-]{3,}/g) || [];
+      return palabras.join(' ');
+    } catch (e) {
+      return '';
+    }
   }
 
   // 4. Si es un PDF
@@ -644,7 +664,7 @@ CRITERIOS DE ACEPTACIÓN:
                 type="file" 
                 ref={fileInputRef}
                 style={{ display: 'none' }}
-                accept=".docx,.pdf,.xlsx,.xls,.txt,.md,.json,.csv"
+                accept=".docx,.doc,.pdf,.xlsx,.xls,.txt,.md,.json,.csv"
                 onChange={handleFileInputChange}
               />
 
