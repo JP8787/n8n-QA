@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as XLSX from 'xlsx';
-import SpreadsheetViewer from './SpreadsheetViewer';
 
 // Configuración obligatoria para que el lector de PDF funcione en el navegador
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -501,50 +500,53 @@ CRITERIOS DE ACEPTACIÓN:
                     </div>
                   </div>
 
-                  {/* VISOR DE HOJA DE CÁLCULO ACOMODADO EN VIVO (Sin descargas forzadas) */}
-                  {n8nResult.cases && (
-                    <div className="result-spreadsheet-preview">
-                      <SpreadsheetViewer
-                        cases={n8nResult.cases}
-                        uploadedFileName={n8nResult.fileName || (file ? file.name : '')}
-                        moduleName={n8nResult.module}
-                        isLive={true}
-                        compact={true}
-                      />
-                    </div>
-                  )}
-
-                  {/* Botones de Navegación y Enlace Oficial */}
-                  <div className="result-actions-grid">
-                    <button 
-                      type="button" 
-                      className="btn-action-view-table"
-                      onClick={onScrollToMatrix}
-                      title="Ver e inspeccionar columnas en la sección principal"
-                    >
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                        <line x1="3" y1="9" x2="21" y2="9"></line>
-                        <line x1="9" y1="21" x2="9" y2="9"></line>
-                      </svg>
-                      <span>Inspeccionar Columnas en Sección Principal</span>
-                    </button>
-
-                    {n8nResult.sheetUrl && (
-                      <a 
-                        href={n8nResult.sheetUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="btn-action-google-sheet"
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                          <polyline points="15 3 21 3 21 9"></polyline>
-                          <line x1="10" y1="14" x2="21" y2="3"></line>
+                  {/* Letrero / Banner de Sincronización con Botón para Subir a la Hoja Superior */}
+                  <div className="result-synced-notice-box">
+                    <div className="notice-header-row">
+                      <div className="notice-icon-circle">
+                        <svg viewBox="0 0 24 24" width="26" height="26" fill="#107c41">
+                          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+                          <path d="M7 7h4v2H7zm0 4h4v2H7zm0 4h4v2H7zm6-8h4v2h-4zm0 4h4v2h-4zm0 4h4v2h-4z"/>
                         </svg>
-                        <span>Abrir en Google Sheets</span>
-                      </a>
-                    )}
+                      </div>
+                      <div className="notice-text-content">
+                        <h4 className="notice-title">¡Matriz QA cargada con éxito en la tabla de arriba!</h4>
+                        <p className="notice-description">
+                          Los <strong>{n8nResult.cases ? n8nResult.cases.length : 0} casos de prueba</strong> para tu archivo <strong>"{n8nResult.fileName || (file ? file.name : '')}"</strong> ya quedaron estructurados y listos en la hoja de cálculo oficial superior (Sección 4).
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="notice-actions-row">
+                      <button 
+                        type="button" 
+                        className="btn-scroll-up-to-matrix"
+                        onClick={onScrollToMatrix}
+                        title="Subir a ver la Matriz QA en la sección superior"
+                      >
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <line x1="12" y1="19" x2="12" y2="5"></line>
+                          <polyline points="5 12 12 5 19 12"></polyline>
+                        </svg>
+                        <span>Ver Matriz en la Hoja de Arriba (11 Columnas)</span>
+                      </button>
+
+                      {n8nResult.sheetUrl && (
+                        <a 
+                          href={n8nResult.sheetUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="btn-action-google-sheet"
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                          <span>Abrir en Google Sheets</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
 
                   {/* Acordeón Plegable para Respuesta Técnica JSON (Opcional) */}
