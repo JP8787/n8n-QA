@@ -187,20 +187,56 @@ export default function SpreadsheetViewer({
     }
   };
 
-  // Mapeo seguro de filas
+  // Helper inteligente tolerante a mayúsculas, minúsculas, tildes y nombres extendidos de n8n
+  const getCaseValue = (c, candidateKeys, fallback = '') => {
+    if (!c || typeof c !== 'object') return fallback;
+
+    // 1. Coincidencia exacta directa
+    for (const k of candidateKeys) {
+      if (c[k] !== undefined && c[k] !== null && String(c[k]).trim() !== '') {
+        return String(c[k]);
+      }
+    }
+
+    // 2. Coincidencia normalizada (sin tildes, minúsculas, sin espacios ni caracteres especiales)
+    const normalize = (str) =>
+      str
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+
+    const objectKeys = Object.keys(c);
+    const normalizedCandidateKeys = candidateKeys.map(normalize);
+
+    for (const objKey of objectKeys) {
+      const normObjKey = normalize(objKey);
+      for (const normCand of normalizedCandidateKeys) {
+        if (normObjKey === normCand || normObjKey.includes(normCand) || normCand.includes(normObjKey)) {
+          if (c[objKey] !== undefined && c[objKey] !== null && String(c[objKey]).trim() !== '') {
+            return String(c[objKey]);
+          }
+        }
+      }
+    }
+
+    return fallback;
+  };
+
+  // Mapeo seguro y resiliente de filas para soportar cualquier variación enviada por n8n
   const displayRows = (cases && cases.length > 0)
     ? cases.map((c, idx) => ({
-        id: c.Id || c.id || `CP-${String(idx + 1).padStart(4, '0')}`,
-        module: c['Funcionalidad / Característica'] || c.module || c.modulo || moduleName || 'Módulo QA',
-        desc: c['Descripción'] || c.desc || c.description || 'Validación de flujo generado automáticamente.',
-        date: c['Fecha'] || c.date || new Date().toLocaleDateString('es-ES'),
-        scenario: c['Caso de Prueba'] || c.scenario || c.caso || 'Caso de prueba generado por IA',
-        given: c['Precondiciones'] || c.given || c.precondicion || 'Precondición definida en el criterio de aceptación.',
-        when: c['Datos / Acciones de Entrada'] || c.when || c.acciones || '1. Ejecutar pasos de prueba',
-        then: c['Resultado Esperado'] || c.then || c.esperado || 'HTTP 200 OK / Validación exitosa',
-        env: c['Requerimientos de Ambiente'] || c.env || c.ambiente || 'Entorno Staging / Producción',
-        special: c['Procedimientos Especiales'] || c.special || c.especiales || 'N/A',
-        post: c['Postcondición'] || c.post || c.postcondicion || 'N/A'
+        id: getCaseValue(c, ['Id', 'id', 'ID', 'identificador'], `CP-${String(idx + 1).padStart(4, '0')}`),
+        module: getCaseValue(c, ['Funcionalidad / Característica', 'Funcionalidad', 'Característica', 'modulo', 'module', 'feature'], moduleName || 'Módulo QA'),
+        desc: getCaseValue(c, ['Descripción', 'Descripcion', 'desc', 'description'], 'Validación de flujo generado automáticamente.'),
+        date: getCaseValue(c, ['Fecha', 'fecha', 'date', 'timestamp'], new Date().toLocaleDateString('es-ES')),
+        scenario: getCaseValue(c, ['Caso de Prueba', 'caso_de_prueba', 'scenario', 'caso', 'titulo'], 'Caso de prueba generado por IA'),
+        given: getCaseValue(c, ['Precondiciones', 'Precondición', 'Precondicion', 'given', 'precondiciones_bdd'], 'Precondición definida en el criterio de aceptación.'),
+        when: getCaseValue(c, ['Datos / Acciones de Entrada', 'Datos de Entrada', 'Acciones de Entrada', 'Acciones', 'Pasos', 'when', 'acciones_bdd'], '1. Ejecutar pasos de prueba'),
+        then: getCaseValue(c, ['Resultado Esperado', 'resultado_esperado', 'then', 'esperado', 'resultado'], 'HTTP 200 OK / Validación exitosa'),
+        env: getCaseValue(c, ['Requerimientos de Ambiente de Pruebas', 'Requerimientos de Ambiente', 'Ambiente de Pruebas', 'Ambiente', 'env', 'environment'], 'Entorno Staging / Producción'),
+        special: getCaseValue(c, ['Procedimientos especiales requeridos', 'Procedimientos Especiales', 'Procedimiento Especial', 'Procedimientos', 'special', 'setup', 'cleanup'], 'N/A'),
+        post: getCaseValue(c, ['Postcondicion', 'Postcondición', 'Postcondiciones', 'Estado Final', 'post', 'postcondition', 'postconditions'], 'N/A')
       }))
     : SAMPLE_QA_ROWS;
 
