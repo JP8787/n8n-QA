@@ -9,22 +9,140 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 // URL oficial del Webhook de n8n configurada (Túnel HTTPS seguro de Cloudflare para acceso desde celulares y GitHub Pages)
 const DEFAULT_WEBHOOK_URL = "https://turbo-southwest-detect-downloaded.trycloudflare.com/webhook/generar-qa";
 
-// Diagnóstico inteligente de errores para que cualquier persona entienda qué ocurrió sin tecnicismos
+// Validación preventiva y profunda: Analiza si el documento realmente contiene criterios de aceptación y requerimientos de software
+const validarCriteriosDeAceptacion = (currentFile, extractedText) => {
+  // Si es el archivo de ejemplo oficial cargado por el sistema, se aprueba automáticamente
+  if (currentFile?.isSample) {
+    return { isValid: true };
+  }
+
+  const cleanText = (extractedText || '').trim();
+  const lowerText = cleanText.toLowerCase();
+  const fileNameLower = (currentFile?.name || '').toLowerCase();
+  const combined = `${fileNameLower} ${lowerText}`;
+
+  // 1. Caso: Documento vacío o sin texto legible
+  if (cleanText.length < 20) {
+    return {
+      isValid: false,
+      diagnosis: {
+        category: 'empty',
+        badge: 'Documento sin Texto Legible',
+        badgeColor: 'orange',
+        title: 'El archivo está vacío o no contiene texto digital legible',
+        desc: `No se pudo extraer texto suficiente de "${currentFile?.name || 'tu archivo'}". Puede tratarse de un archivo en blanco, protegido o con imágenes escaneadas sin texto seleccionable.`,
+        solutions: [
+          'Verifica que el archivo contenga texto digital seleccionable (no imágenes pegadas).',
+          'Sube un archivo en formato Word (.docx), Excel (.xlsx), PDF con texto o texto (.txt, .csv).'
+        ],
+        showLoadSample: true
+      }
+    };
+  }
+
+  // 2. Caso: Presupuestos, Cotizaciones y Propuestas Comerciales (Causa común de caída de flujo)
+  const presupuestoKeywords = [
+    'presupuesto', 'presupuestos', 'cotizacion', 'cotización', 'cotizaciones', 'proforma', 
+    'precio unitario', 'valor unitario', 'precio total', 'subtotal', 'iva', 'anticipo', 
+    'estimacion de costos', 'estimación de costos', 'forma de pago', 'validez de la oferta', 
+    'condiciones comerciales', 'tarifa', 'honorarios', 'costo estimado', 'descuento comercial', 
+    'propuesta economica', 'propuesta económica', 'lista de precios', 'orden de compra'
+  ];
+  const isPresupuesto = presupuestoKeywords.some(kw => combined.includes(kw));
+
+  if (isPresupuesto) {
+    return {
+      isValid: false,
+      diagnosis: {
+        category: 'presupuesto',
+        badge: 'Presupuesto / Documento Comercial No Compatible',
+        badgeColor: 'orange',
+        title: 'El archivo parece ser un presupuesto o cotización comercial',
+        desc: `Revisamos el contenido de "${currentFile?.name || 'tu archivo'}" antes de enviarlo a n8n y detectamos que contiene términos de presupuestos, precios o cotizaciones comerciales. Nuestro pipeline de IA está entrenado exclusivamente para Software QA (criterios de aceptación para probar sistemas). Si enviamos un presupuesto, el flujo en n8n falla porque no encuentra pantallas, botones ni flujos para generar la matriz.`,
+        solutions: [
+          'Sube un documento que describa cómo debe funcionar un sistema o aplicación (ej: inicio de sesión, registro de usuarios, catálogo, pasarela de pagos, etc.).',
+          'Asegúrate de que incluya criterios de aceptación (ej: "Dado que... Cuando... Entonces..." o "El sistema debe permitir...").',
+          'Haz clic en el botón "Cargar Archivo de Software de Ejemplo" para probar la automatización con un archivo oficial de requerimientos QA.'
+        ],
+        showLoadSample: true
+      }
+    };
+  }
+
+  // 3. Caso: Contabilidad, Balances y Finanzas
+  const accountingKeywords = [
+    'contab', 'balance general', 'asiento contable', 'asientos contables', 'libro mayor', 
+    'puc', 'activo corriente', 'pasivo corriente', 'patrimonio neto', 'extracto bancario', 
+    'retencion en la fuente', 'tributar', 'debe y haber', 'cuenta por cobrar', 'factura electronica'
+  ];
+  const isAccounting = accountingKeywords.some(kw => combined.includes(kw));
+
+  if (isAccounting) {
+    return {
+      isValid: false,
+      diagnosis: {
+        category: 'accounting',
+        badge: 'Documento Contable No Compatible con QA',
+        badgeColor: 'orange',
+        title: 'El archivo subido parece ser de tipo contable o financiero',
+        desc: `Detectamos que "${currentFile?.name || 'tu archivo'}" contiene números, balances o asientos contables en lugar de requerimientos de software. Esta Inteligencia Artificial está entrenada para leer criterios de aceptación de sistemas e historias de usuario para generar casos de prueba QA.`,
+        solutions: [
+          'Los documentos contables no contienen pantallas, botones ni flujos de usuario para probar.',
+          'Haz clic en el botón "Cargar Archivo de Software de Ejemplo" para probar con un archivo oficial de software QA.'
+        ],
+        showLoadSample: true
+      }
+    };
+  }
+
+  // 4. Caso: Verificación de Concordancia de Software / QA
+  // Comprobamos si el archivo contiene terminología real de requerimientos, interfaces, usuarios o pruebas
+  const qaSignals = [
+    'criterio', 'criterios', 'aceptacion', 'aceptación', 'acceptance', 'historia de usuario',
+    'user story', 'bdd', 'tdd', 'gherkin', 'dado', 'cuando', 'entonces', 'given', 'when', 'then',
+    'escenario', 'scenario', 'requerimiento', 'requisito', 'especificacion', 'especificación',
+    'modulo', 'módulo', 'funcionalidad', 'caso de prueba', 'test case', 'usuario', 'pantalla',
+    'interfaz', 'boton', 'botón', 'clic', 'click', 'formulario', 'campo', 'validar', 'validacion',
+    'validación', 'obligatorio', 'login', 'iniciar sesion', 'iniciar sesión', 'cerrar sesion',
+    'logout', 'contraseña', 'password', 'correo', 'email', 'autenticacion', 'autenticación',
+    'token', 'redireccionar', 'mensaje de error', 'alerta', 'dashboard', 'rol', 'permisos',
+    'api', 'endpoint', 'base de datos', 'registro', 'sistema', 'crud', 'editar', 'eliminar', 'guardar'
+  ];
+
+  const matchedQASignals = qaSignals.filter(kw => combined.includes(kw));
+
+  // Si no contiene ningún término o indicador relacionado con desarrollo o prueba de software
+  if (matchedQASignals.length === 0) {
+    return {
+      isValid: false,
+      diagnosis: {
+        category: 'no_criteria',
+        badge: 'Sin Criterios de Aceptación de Software',
+        badgeColor: 'orange',
+        title: 'El archivo no contiene criterios de aceptación ni requerimientos de software',
+        desc: `Analizamos el texto de "${currentFile?.name || 'tu archivo'}" antes de enviarlo a n8n y no encontramos criterios de aceptación (Dado/Cuando/Entonces), historias de usuario ni reglas de funcionamiento de un sistema. Para que la IA de n8n pueda diseñar casos de prueba válidos, el archivo debe describir funciones de un software que se puedan probar.`,
+        solutions: [
+          'Asegúrate de que el documento describa cómo debe actuar el sistema (ej: "1. Permitir login con correo válido", "2. Bloquear cuenta al tercer intento fallido").',
+          'Evita subir cartas, ensayos, cotizaciones o textos genéricos que no tengan relación con el desarrollo o prueba de software.',
+          'Haz clic en "Cargar Archivo de Software de Ejemplo" para ver la estructura exacta que espera la automatización.'
+        ],
+        showLoadSample: true
+      }
+    };
+  }
+
+  // Si superó todas las pruebas, el documento es concordante y apto para procesarse en n8n
+  return { isValid: true, matchedCount: matchedQASignals.length };
+};
+
+// Diagnóstico inteligente de errores de red o comunicación
 const diagnoseError = (err, currentFile, extractedText, currentWebhookUrl) => {
   const isMobile = typeof window !== 'undefined' && 
     (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const isLocalhostUrl = currentWebhookUrl.includes('localhost') || currentWebhookUrl.includes('127.0.0.1');
 
-  const combinedText = ((currentFile?.name || '') + ' ' + (extractedText || '')).toLowerCase();
-  const accountingKeywords = [
-    'contab', 'balance', 'factura', 'asiento', 'iva', 'retencion', 
-    'nomina', 'extracto', 'financier', 'debe', 'haber', 'puc', 'impuesto', 
-    'tributar', 'activo corriente', 'pasivo', 'patrimonio', 'saldo', 'cuenta por cobrar'
-  ];
-  const isAccounting = accountingKeywords.some(k => combinedText.includes(k));
-
-  // 1. Caso: Navegación desde Celular / Dispositivo Móvil
+  // 1. Caso: Navegación desde Celular intentando conectar a localhost
   if (isMobile && isLocalhostUrl) {
     return {
       category: 'mobile',
@@ -34,9 +152,9 @@ const diagnoseError = (err, currentFile, extractedText, currentWebhookUrl) => {
       desc: 'Tu servidor de n8n está instalado en tu computadora personal (`localhost:5678`). Cuando pulsas el botón desde tu celular, este intenta buscar n8n dentro del propio teléfono (donde no está instalado), por lo que no puede comunicarse.',
       solutions: [
         'La opción más fácil y recomendada: Abre este enlace directamente desde el navegador de tu computadora donde tienes n8n abierto.',
-        'Si deseas probar desde tu celular: Puedes cambiar la URL del Webhook abajo para poner la dirección IP local de tu PC en la red Wi-Fi (ej: http://192.168.1.50:5678/webhook/generar-qa) o una URL pública de n8n Cloud / ngrok.'
+        'O asegúrate de que el túnel seguro de Cloudflare o ngrok esté activo en tu computadora.'
       ],
-      allowEditUrl: true
+      allowEditUrl: false
     };
   }
 
@@ -50,57 +168,26 @@ const diagnoseError = (err, currentFile, extractedText, currentWebhookUrl) => {
       desc: 'Estás visitando la página desde un enlace seguro HTTPS (GitHub Pages). Por normas de seguridad internacionales, los navegadores impiden que una página HTTPS envíe datos a una dirección HTTP local sin cifrar (`http://localhost:5678`).',
       solutions: [
         'Para probar tu n8n local en esta computadora, ejecuta el proyecto localmente (http://localhost:5173).',
-        'O configura una URL pública HTTPS para tu n8n utilizando un túnel seguro como ngrok o n8n Cloud.'
+        'O mantén activo tu túnel seguro HTTPS de Cloudflare en tu terminal.'
       ],
-      allowEditUrl: true
+      allowEditUrl: false
     };
   }
 
-  // 3. Caso: Archivo Contable o no apto para QA de Software
-  if (isAccounting) {
-    return {
-      category: 'accounting',
-      badge: 'Documento No Compatible con QA',
-      badgeColor: 'orange',
-      title: 'El archivo subido parece ser de tipo contable o financiero',
-      desc: `Detectamos que "${currentFile?.name || 'tu archivo'}" contiene números, balances o asientos contables en lugar de requerimientos de software. Esta Inteligencia Artificial está entrenada para leer criterios de aceptación de sistemas e historias de usuario para generar casos de prueba QA.`,
-      solutions: [
-        'Los documentos contables no contienen pantallas, botones ni flujos de usuario para probar.',
-        'Haz clic en el botón de abajo "Cargar Archivo de Prueba" para probar con un ejemplo oficial de software, o sube un documento que describa cómo debe funcionar un sistema (ej: login, registro, carrito de compras).'
-      ],
-      showLoadSample: true
-    };
-  }
-
-  // 4. Caso: Documento vacío o sin texto
-  if (extractedText && extractedText.trim().length < 15) {
-    return {
-      category: 'empty',
-      badge: 'Documento sin Texto Legible',
-      badgeColor: 'orange',
-      title: 'No encontramos texto dentro del documento',
-      desc: `El archivo "${currentFile?.name || 'tu archivo'}" parece estar vacío o contiene imágenes escaneadas sin texto digital seleccionable.`,
-      solutions: [
-        'Verifica que el archivo no esté en blanco ni protegido contra copia.',
-        'Sube un archivo Word (.docx), Excel (.xlsx), PDF con texto o un archivo de texto (.txt).'
-      ],
-      showLoadSample: true
-    };
-  }
-
-  // 5. Caso: Servidor n8n apagado o no responde en la PC
+  // 3. Caso: Servidor n8n apagado o no responde en la PC
   return {
     category: 'network',
     badge: 'Servidor n8n Desconectado',
     badgeColor: 'rose',
     title: 'No se pudo conectar con tu flujo en n8n',
-    desc: 'No recibimos respuesta de tu n8n en `localhost:5678`. Esto ocurre comúnmente cuando n8n no está iniciado en la terminal o el flujo no está en modo de escucha.',
+    desc: 'No recibimos respuesta del túnel o servidor de n8n. Esto ocurre comúnmente cuando n8n no está iniciado en la terminal, el flujo no está activo o se cerró la ventana de Cloudflare.',
     solutions: [
       'Verifica que n8n esté ejecutándose en tu terminal (comando: `n8n start`).',
-      'Abre n8n en tu navegador (http://localhost:5678) y asegúrate de que el workflow tenga el switch "Active" encendido o esté en modo "Test step".',
+      'Asegúrate de que la ventana de Cloudflare Tunnel siga abierta en tu barra de tareas.',
+      'Abre n8n en tu navegador (http://localhost:5678) y confirma que el workflow tenga el switch "Active" encendido o esté en modo "Test step".',
       'Confirma que el nodo Webhook tenga el método POST y la ruta "generar-qa".'
     ],
-    allowEditUrl: true
+    allowEditUrl: false
   };
 };
 
@@ -326,25 +413,22 @@ CRITERIOS DE ACEPTACIÓN:
       ]);
     }
 
-    // Detección proactiva y amigable de documentos contables o vacíos
-    const combinedLower = ((currentFile?.name || '') + ' ' + (textoExtraido || '')).toLowerCase();
-    const accountingKeywords = [
-      'contab', 'balance', 'factura', 'asiento', 'iva', 'retencion', 
-      'nomina', 'extracto', 'financier', 'debe', 'haber', 'puc', 'impuesto', 
-      'tributar', 'activo corriente', 'pasivo', 'patrimonio', 'saldo', 'cuenta por cobrar'
-    ];
-    const isAccountingDoc = accountingKeywords.some(kw => combinedLower.includes(kw));
-
-    if (isAccountingDoc) {
-      const diag = diagnoseError(new Error("Documento contable detectado"), currentFile, textoExtraido, webhookUrl);
-      setWebhookError(diag);
+    // Validación preventiva profunda: ¿El archivo contiene de verdad criterios de aceptación y concordancia con software?
+    const validacion = validarCriteriosDeAceptacion(currentFile, textoExtraido);
+    if (!validacion.isValid) {
+      setWebhookError(validacion.diagnosis);
       setIsSending(false);
       setExecutionLogs(prev => [
         ...prev,
-        `[${new Date().toLocaleTimeString()}] Detección: El archivo "${currentFile.name}" contiene términos contables/financieros.`
+        `[${new Date().toLocaleTimeString()}] Validación preventiva: ${validacion.diagnosis.title}. Envío detenido para proteger tu flujo en n8n.`
       ]);
       return;
     }
+
+    setExecutionLogs(prev => [
+      ...prev,
+      `[${new Date().toLocaleTimeString()}] Validación exitosa: Criterios de software y concordancia QA confirmados (${validacion.matchedCount || 1} indicadores clave). Procediendo al envío...`
+    ]);
 
     const reader = new FileReader();
 
