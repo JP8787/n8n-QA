@@ -67,7 +67,6 @@ export default function InteractiveTestSection({ onCasesGenerated, onScrollToMat
   const [executionLogs, setExecutionLogs] = useState([]);
   const [n8nResult, setN8nResult] = useState(null);
   const [webhookError, setWebhookError] = useState(null);
-  const [showJson, setShowJson] = useState(false);
   const fileInputRef = useRef(null);
 
   // Carga de archivo de requerimientos de prueba
@@ -547,27 +546,6 @@ CRITERIOS DE ACEPTACIÓN:
                         </a>
                       )}
                     </div>
-                  </div>
-
-                  {/* Acordeón Plegable para Respuesta Técnica JSON (Opcional) */}
-                  <div className="result-json-accordion">
-                    <button 
-                      type="button" 
-                      className="btn-toggle-json"
-                      onClick={() => setShowJson(!showJson)}
-                    >
-                      <span className="toggle-label">
-                        {showJson ? '▾ Ocultar Respuesta Técnica JSON de n8n' : '▸ Ver Respuesta Técnica JSON de n8n (Opcional)'}
-                      </span>
-                      <span className="toggle-tag">JSON</span>
-                    </button>
-
-                    {showJson && (
-                      <div className="terminal-json-output">
-                        <div className="terminal-header">Respuesta de n8n (Payload Raw)</div>
-                        <pre>{JSON.stringify(n8nResult.raw || n8nResult, null, 2)}</pre>
-                      </div>
-                    )}
                   </div>
                 </div>
               ) : (
