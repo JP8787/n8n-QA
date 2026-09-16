@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker || 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.worker.min.mjs';
 
 // URL oficial del Webhook de n8n configurada (Túnel HTTPS seguro de Cloudflare para acceso público desde celulares y GitHub Pages)
-const DEFAULT_WEBHOOK_URL = "https://academic-expensive-dir-luis.trycloudflare.com/webhook/generar-qa";
+const DEFAULT_WEBHOOK_URL = "https://computation-immune-except-adjustment.trycloudflare.com/webhook/generar-qa";
 
 
 
@@ -198,7 +198,8 @@ export default function InteractiveTestSection({ onCasesGenerated, onScrollToMat
         !saved.includes('localhost') && 
         !saved.includes('sol-florida') && 
         !saved.includes('turbo-southwest') &&
-        saved.includes('academic-expensive-dir-luis')
+        !saved.includes('academic-expensive') &&
+        saved.includes('computation-immune-except-adjustment')
       ) {
         return saved;
       }
